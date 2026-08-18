@@ -13,6 +13,7 @@
 #endif
 #include <display/main.h>
 #include <display/ui/utils/effects.h>
+#include <display/ui/concept/ConceptUI.h>
 #include <utility>
 
 #include "esp_sntp.h"
@@ -20,8 +21,6 @@
 #include <display/ui/default/eez/ui.h>
 
 static EffectManager effect_mgr;
-
-static constexpr uint32_t STARTUP_FADE_MS = 1000; // standby fade-in duration on power-up
 
 static constexpr int32_t GAUGE_TICK_LONG = 25;      // meter tick length on most screens
 static constexpr int32_t GAUGE_TICK_SHORT = 10;     // shortened tick length on profile / new-menu screens
@@ -46,6 +45,27 @@ static float clampPercentage(float pct) { return pct < 0.0f ? 0.0f : (pct > 100.
 static bool stringChanged(const char *current, const char *next) {
     return current == nullptr || next == nullptr || strcmp(current, next) != 0;
 }
+
+#ifdef GAGGIMATE_SIM
+void DefaultUI::previewConceptStatus(float elapsedSeconds, float weight, float pressureValue, const char *phase,
+                                     bool complete) {
+    if (conceptUI == nullptr) return;
+    ConceptUIState state;
+    state.temperature = 93.0f;
+    state.targetTemperature = 93.0f;
+    state.pressure = pressureValue;
+    state.targetPressure = 9.0f;
+    state.weight = weight;
+    state.elapsedSeconds = elapsedSeconds;
+    state.elapsedPercentage = elapsedSeconds > 0.0f ? 1.0f : 0.0f;
+    state.phase = phase;
+    state.profile = "ESPRESSO";
+    state.temperatureStable = true;
+    state.processComplete = complete;
+    state.preview = true;
+    conceptUI->update(state);
+}
+#endif
 
 int16_t calculate_angle(int set_temp, int range, int offset) {
     const double percentage = static_cast<double>(set_temp) / static_cast<double>(MAX_TEMP);
@@ -271,6 +291,33 @@ void DefaultUI::loop() {
 
         handleScreenChange();
         currentScreen = static_cast<ScreensEnum>(eez_flow_get_current_screen());
+        if (conceptUI != nullptr) {
+            ConceptUIState conceptState;
+            conceptState.temperature = boiler.current_temperature();
+            conceptState.targetTemperature = boiler.target_temperature();
+            conceptState.pressure = boiler.current_pressure();
+            conceptState.targetPressure = boiler.target_pressure();
+            conceptState.weight = mode == MODE_GRIND ? currentWeight.getFloat() : brewProcess.current_volume();
+            conceptState.elapsedPercentage = brewProcess.elapsed_percentage();
+            conceptState.elapsedSeconds = brewElapsedSeconds;
+            conceptState.elapsed = brewProcess.elapsed_time();
+            conceptState.phase = brewProcess.phase_type();
+            conceptState.profile = selectedProfileInfo.name();
+            conceptState.brewTarget = selectedProfileInfo.is_volumetric() ? "" : selectedProfileInfo.time();
+            conceptState.volumetric = selectedProfileInfo.is_volumetric();
+            if (conceptState.volumetric) {
+                static char conceptWeightTarget[20];
+                snprintf(conceptWeightTarget, sizeof(conceptWeightTarget), "%.1f g", selectedProfileInfo.target_weight());
+                conceptState.brewTarget = conceptWeightTarget;
+            }
+            conceptState.errorLabel = systemStatus.error_label();
+            conceptState.temperatureStable = uiFlags.temperature_stable();
+            conceptState.connected = systemStatus.bluetooth();
+            conceptState.wifi = systemStatus.wifi();
+            conceptState.error = systemStatus.error();
+            conceptState.processComplete = brewProcess.is_complete();
+            conceptUI->update(conceptState);
+        }
         effect_mgr.evaluate_all();
 
         if (currentScreen == SCREEN_ID_STANDBY_SCREEN) {
@@ -369,20 +416,16 @@ void DefaultUI::onVolumetricDelete() {
 
 void DefaultUI::setupPanel() {
     ui_init();
+    conceptUI = new ConceptUI(controller, this);
+    conceptUI->init();
     setupState();
     applyTheme();
     ui_tick();
 
-    // Polished power-up: ui_init() makes standby active instantly, so stage a black screen and
-    // fade standby in over it (lv_scr_load_anim no-ops when the target is already the active screen).
-    lv_obj_t *standby = lv_scr_act();
-    lv_obj_t *black = lv_obj_create(nullptr);
-    lv_obj_set_style_bg_color(black, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(black, LV_OPA_COVER, LV_PART_MAIN);
-    lv_scr_load(black);
-    lv_scr_load_anim(standby, LV_SCR_LOAD_ANIM_FADE_ON, STARTUP_FADE_MS, 0, true);
-
     lv_task_handler();
+    // Keep the native concept screen as the visible interaction layer after
+    // EEZ has initialized its generated data model.
+    conceptUI->show(SCREEN_ID_STANDBY_SCREEN);
 
     delay(100);
     // Set initial brightness based on settings
@@ -463,6 +506,9 @@ void DefaultUI::handleScreenChange() {
             setBrightness(settings.getMainBrightness());
         }
         eez_flow_set_screen(targetScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0);
+        if (conceptUI != nullptr) {
+            conceptUI->show(targetScreen);
+        }
         animateGaugeTicks(currentScreen, targetScreen);
         rerender = true;
     }
@@ -665,6 +711,7 @@ void DefaultUI::updateBrewProcess() {
     }
     const bool validBrew = process != nullptr && process->getType() == MODE_BREW;
     if (!validBrew) {
+        brewElapsedSeconds = 0.0f;
         if (stringChanged(brewProcess.phase_type(), ""))
             brewProcess.phase_type("");
         if (stringChanged(brewProcess.phase_name(), ""))
@@ -718,6 +765,7 @@ void DefaultUI::updateBrewProcess() {
         now = bp->finished;
     }
     const unsigned long elapsedMs = (bp->processStarted > 0 && now >= bp->processStarted) ? now - bp->processStarted : 0;
+    brewElapsedSeconds = elapsedMs / 1000.0f;
     formatDuration(elapsedMs, buf, sizeof(buf));
     if (stringChanged(brewProcess.elapsed_time(), buf))
         brewProcess.elapsed_time(buf);

@@ -1,0 +1,210 @@
+#ifndef CONCEPT_UI_H
+#define CONCEPT_UI_H
+
+#include <lvgl.h>
+#include <display/ui/default/eez/screens.h>
+
+class Controller;
+class DefaultUI;
+
+extern "C" {
+LV_FONT_DECLARE(dm_sans_88_bold);
+LV_FONT_DECLARE(dm_sans_30);
+LV_FONT_DECLARE(dm_sans_38);
+LV_FONT_DECLARE(dm_sans_16_light);
+LV_FONT_DECLARE(dm_sans_10_units);
+LV_FONT_DECLARE(dm_sans_14);
+LV_FONT_DECLARE(dm_sans_9);
+LV_FONT_DECLARE(dm_sans_12);
+LV_FONT_DECLARE(dm_sans_12_medium);
+LV_FONT_DECLARE(dm_sans_12_bold);
+LV_FONT_DECLARE(dm_sans_13);
+LV_FONT_DECLARE(dm_sans_11);
+LV_FONT_DECLARE(dm_sans_30_bold);
+LV_FONT_DECLARE(dm_sans_30_light);
+LV_FONT_DECLARE(dm_mono_12);
+LV_FONT_DECLARE(dm_mono_9);
+LV_FONT_DECLARE(dm_mono_13);
+LV_FONT_DECLARE(dm_mono_15);
+LV_FONT_DECLARE(dm_mono_17);
+LV_IMG_DECLARE(concept_sleeping_eye);
+LV_IMG_DECLARE(concept_heart_eye);
+LV_IMG_DECLARE(concept_tongue);
+LV_IMG_DECLARE(concept_smile);
+LV_IMG_DECLARE(concept_mini_heart);
+LV_IMG_DECLARE(concept_standby_hint);
+LV_IMG_DECLARE(concept_menu_cup);
+LV_IMG_DECLARE(concept_menu_drops);
+LV_IMG_DECLARE(concept_menu_water);
+LV_IMG_DECLARE(concept_menu_bean);
+LV_IMG_DECLARE(concept_bg_heating);
+LV_IMG_DECLARE(concept_bg_ready);
+LV_IMG_DECLARE(concept_bg_preinfuse);
+LV_IMG_DECLARE(concept_bg_brewing);
+LV_IMG_DECLARE(concept_bg_done);
+LV_IMG_DECLARE(concept_bg_steam);
+LV_IMG_DECLARE(concept_bg_water);
+LV_IMG_DECLARE(concept_bg_grind);
+LV_IMG_DECLARE(concept_timer);
+LV_IMG_DECLARE(concept_pressure);
+LV_IMG_DECLARE(concept_target);
+LV_IMG_DECLARE(concept_play);
+LV_IMG_DECLARE(concept_stop);
+LV_IMG_DECLARE(concept_up_hint);
+LV_IMG_DECLARE(concept_down_hint);
+LV_IMG_DECLARE(concept_heat);
+LV_IMG_DECLARE(concept_drop);
+LV_IMG_DECLARE(concept_steam);
+LV_IMG_DECLARE(concept_water);
+LV_IMG_DECLARE(concept_grind);
+LV_IMG_DECLARE(concept_spinner);
+LV_IMG_DECLARE(concept_power);
+LV_IMG_DECLARE(concept_wifi);
+LV_IMG_DECLARE(concept_bluetooth);
+LV_IMG_DECLARE(concept_profile_left);
+LV_IMG_DECLARE(concept_profile_right);
+}
+
+struct ConceptUIState {
+    float temperature = 0.0f;
+    float targetTemperature = 0.0f;
+    float pressure = 0.0f;
+    float targetPressure = 0.0f;
+    float weight = 0.0f;
+    float elapsedPercentage = 0.0f;
+    float elapsedSeconds = 0.0f;
+    const char *elapsed = "0:00";
+    const char *phase = "";
+    const char *profile = "";
+    const char *brewTarget = "";
+    const char *errorLabel = "";
+    bool temperatureStable = false;
+    bool connected = false;
+    bool wifi = false;
+    bool error = false;
+    bool processComplete = false;
+    bool volumetric = false;
+    bool preview = false;
+};
+
+class ConceptUI {
+  public:
+    ConceptUI(Controller *controller, DefaultUI *owner);
+    void init();
+    void show(ScreensEnum screen);
+    void update(const ConceptUIState &state);
+    lv_obj_t *screen() const { return root; }
+
+  private:
+    enum class View { Standby, Menu, Brew, Status, Steam, Water, Grind, Info };
+
+    Controller *controller;
+    DefaultUI *owner;
+    lv_obj_t *root = nullptr;
+    lv_obj_t *stateBackground = nullptr;
+    lv_obj_t *brand = nullptr;
+    lv_obj_t *brandMate = nullptr;
+    lv_obj_t *standbyClock = nullptr;
+    lv_obj_t *standbyProfileRow = nullptr;
+    lv_obj_t *standbyTargetIcon = nullptr;
+    lv_obj_t *standbyProfile = nullptr;
+    lv_obj_t *standbyProfileTemp = nullptr;
+    lv_obj_t *standbyFace = nullptr;
+    lv_obj_t *standbyEyes[2] = {nullptr};
+    lv_obj_t *standbyHeartEyes[2] = {nullptr};
+    lv_obj_t *standbyMouth = nullptr;
+    lv_obj_t *standbySmile = nullptr;
+    lv_obj_t *standbyBlush[2] = {nullptr};
+    lv_obj_t *standbyZ[3] = {nullptr};
+    lv_obj_t *standbyFloatingHearts[3] = {nullptr};
+    lv_obj_t *standbyHint = nullptr;
+    lv_obj_t *connection = nullptr;
+    lv_obj_t *connectionIcons = nullptr;
+    lv_obj_t *wifiIcon = nullptr;
+    lv_obj_t *bluetoothIcon = nullptr;
+    lv_obj_t *profileRow = nullptr;
+    lv_obj_t *profileLeft = nullptr;
+    lv_obj_t *profileRight = nullptr;
+    lv_obj_t *modeLabel = nullptr;
+    lv_obj_t *stateRow = nullptr;
+    lv_obj_t *stateSpinner = nullptr;
+    lv_obj_t *stateLabel = nullptr;
+    lv_obj_t *contextIcon = nullptr;
+    lv_obj_t *statusTimerIcon = nullptr;
+    lv_obj_t *statusMetrics = nullptr;
+    lv_obj_t *statusWeight = nullptr;
+    lv_obj_t *statusPressure = nullptr;
+    lv_obj_t *statusPressureIcon = nullptr;
+    lv_obj_t *mainValue = nullptr;
+    lv_obj_t *mainDecimal = nullptr;
+    lv_obj_t *mainUnit = nullptr;
+    lv_obj_t *secondaryValue = nullptr;
+    lv_obj_t *targetRow = nullptr;
+    lv_obj_t *targetIcon = nullptr;
+    lv_obj_t *targetDot = nullptr;
+    lv_obj_t *targetPressureIcon = nullptr;
+    lv_obj_t *targetPressure = nullptr;
+    lv_obj_t *phaseLabel = nullptr;
+    lv_obj_t *chart = nullptr;
+    lv_obj_t *chartEndpoint = nullptr;
+    lv_chart_series_t *pressureSeries = nullptr;
+    lv_obj_t *primaryButton = nullptr;
+    lv_obj_t *primaryIcon = nullptr;
+    lv_obj_t *primaryCanvas = nullptr;
+    lv_obj_t *standbyButton = nullptr;
+    lv_obj_t *menuDownHint = nullptr;
+    lv_obj_t *profileDots[5] = {nullptr};
+    lv_obj_t *swipeUpHint = nullptr;
+    lv_obj_t *editPanel = nullptr;
+    lv_obj_t *editButtons[4] = {nullptr};
+    lv_obj_t *editTempValue = nullptr;
+    lv_obj_t *editTargetValue = nullptr;
+    lv_obj_t *editDoneButton = nullptr;
+    lv_obj_t *grindTargetRow = nullptr;
+    lv_obj_t *grindMinus = nullptr;
+    lv_obj_t *grindTargetTimer = nullptr;
+    lv_obj_t *grindTargetValue = nullptr;
+    lv_obj_t *grindPlus = nullptr;
+    lv_obj_t *menuButtons[4] = {nullptr};
+    lv_obj_t *ticks[80] = {nullptr};
+    lv_point_t tickPoints[80][2]{};
+    View view = View::Standby;
+    ConceptUIState lastState{};
+    bool editing = false;
+    bool faceVisible = false;
+    bool standbyHearts = false;
+    uint32_t standbyEnteredAt = 0;
+    uint32_t lastChartSampleAt = 0;
+    int previewChartKind = -1;
+    static constexpr int PRESSURE_HISTORY_CAPACITY = 320;
+    lv_coord_t pressureHistory[PRESSURE_HISTORY_CAPACITY]{};
+    uint16_t pressureHistoryCount = 0;
+    bool completeChartRendered = false;
+    bool touchTracking = false;
+    bool suppressNextClick = false;
+    lv_point_t touchStart{};
+    int visualProfileIndex = 0;
+    int renderedProfileIndex = -1;
+    int renderedTemperatureTicks = -1;
+    int renderedPressureTicks = -1;
+    uint8_t renderedPrimaryState = 0xff;
+    bool mainLayoutDirty = true;
+    void buildRing();
+    void buildMenu();
+    void applyView();
+    void setMode(View next);
+    void updateRing(float temperatureRatio, float pressureRatio);
+    void updateHeatingGradient();
+    void renderCompleteChart();
+    void updatePrimaryButton();
+    void updateProfileDots();
+    void updateTouchGesture();
+    void handlePrimary();
+    void setEditing(bool enabled);
+    void handleGesture(lv_dir_t direction);
+    void updateStandbyFace();
+    static void eventCallback(lv_event_t *event);
+    static void faceTimerCallback(lv_timer_t *timer);
+};
+
+#endif

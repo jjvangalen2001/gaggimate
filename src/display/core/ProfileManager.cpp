@@ -24,6 +24,24 @@ void ProfileManager::setup() {
         selectedProfile = Profile{};
         loadSelectedProfile(selectedProfile);
     }
+#ifdef GAGGIMATE_SIM
+    // The production Default intentionally contains only Brew. Give that
+    // otherwise untouched one-phase profile a short emulator-only infusion so
+    // every process screen can be exercised through the normal Start flow.
+    if (selectedProfile.label == "Default" && selectedProfile.phases.size() == 1 &&
+        selectedProfile.phases[0].phase == PhaseType::PHASE_TYPE_BREW) {
+        Phase infusion{};
+        infusion.name = "Pre-infusion";
+        infusion.phase = PhaseType::PHASE_TYPE_PREINFUSION;
+        infusion.valve = 1;
+        infusion.duration = 3.0f;
+        infusion.pumpIsSimple = true;
+        infusion.pumpSimple = 25;
+        infusion.temperature = 0.0f;
+        selectedProfile.phases.insert(selectedProfile.phases.begin(), infusion);
+        saveProfile(selectedProfile);
+    }
+#endif
     _settings.setFavoritedProfiles(getFavoritedProfiles(true));
 
     String startupProfile = _settings.getStartupProfile();

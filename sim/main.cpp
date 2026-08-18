@@ -17,12 +17,15 @@ Controller controller;
 int main(int argc, char **argv) {
     // Optional: `--screenshot <path> [delayMs]` renders for a bit, saves a BMP, exits.
     const char *shotPath = nullptr;
+    const char *startScreen = nullptr;
     unsigned long shotDelayMs = 4000;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) {
             shotPath = argv[++i];
             if (i + 1 < argc)
                 shotDelayMs = strtoul(argv[i + 1], nullptr, 10);
+        } else if (strcmp(argv[i], "--screen") == 0 && i + 1 < argc) {
+            startScreen = argv[++i];
         }
     }
 
@@ -42,10 +45,28 @@ int main(int argc, char **argv) {
     DefaultUI *ui = controller.getUI();
     const unsigned long start = millis();
     bool shotTaken = false;
+    bool startScreenApplied = false;
 
     while (!drv->shouldQuit()) {
         controller.loop();      // connection lifecycle, comms pump, plugins
         controller.loopLogic(); // process + control logic (normally a FreeRTOS task)
+        if (ui && startScreen && !startScreenApplied && millis() - start >= 500) {
+            if (strcmp(startScreen, "standby") == 0) ui->changeScreen(SCREEN_ID_STANDBY_SCREEN);
+            else if (strcmp(startScreen, "menu") == 0) ui->changeScreen(SCREEN_ID_MENU_SCREEN_NEW);
+            else if (strcmp(startScreen, "brew") == 0) {
+                controller.setMode(MODE_BREW);
+                ui->changeScreen(SCREEN_ID_BREW_SCREEN);
+            }
+            else if (strcmp(startScreen, "steam") == 0) ui->changeScreen(SCREEN_ID_STEAM_SCREEN);
+            else if (strcmp(startScreen, "water") == 0) ui->changeScreen(SCREEN_ID_WATER_SCREEN);
+            else if (strcmp(startScreen, "grind") == 0) ui->changeScreen(SCREEN_ID_GRIND_SCREEN);
+            else if (strcmp(startScreen, "status") == 0 || strcmp(startScreen, "preinfuse") == 0 ||
+                     strcmp(startScreen, "brewing") == 0 || strcmp(startScreen, "complete") == 0) {
+                controller.setMode(MODE_BREW);
+                ui->changeScreen(SCREEN_ID_STATUS_SCREEN);
+            }
+            startScreenApplied = true;
+        }
 
         // Shot history sampling normally runs in its own FreeRTOS task (a no-op in
         // the sim), so drive record() here at its native cadence.
@@ -60,6 +81,14 @@ int main(int argc, char **argv) {
         if (ui) {
             ui->loop();
             ui->loopProfiles();
+            if (startScreenApplied && startScreen != nullptr) {
+                if (strcmp(startScreen, "preinfuse") == 0)
+                    ui->previewConceptStatus(2.2f, 0.0f, 2.5f, "INFUSION", false);
+                else if (strcmp(startScreen, "brewing") == 0)
+                    ui->previewConceptStatus(13.3f, 25.1f, 9.0f, "BREW", false);
+                else if (strcmp(startScreen, "complete") == 0)
+                    ui->previewConceptStatus(17.3f, 36.0f, 0.4f, "COMPLETE", true);
+            }
         }
         gm_web_pump(); // service the embedded WebUI HTTP/WS server
 

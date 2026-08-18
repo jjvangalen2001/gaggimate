@@ -12,6 +12,7 @@
 #include <mutex>
 
 class Controller;
+class ConceptUI;
 
 constexpr int RERENDER_INTERVAL_IDLE = 2500;
 constexpr int RERENDER_INTERVAL_ACTIVE = 100;
@@ -47,6 +48,10 @@ class DefaultUI {
     };
 
     void onVolumetricDelete();
+
+#ifdef GAGGIMATE_SIM
+    void previewConceptStatus(float elapsedSeconds, float weight, float pressure, const char *phase, bool complete);
+#endif
 
     void markDirty() { rerender = true; }
     void markProfileDirty() { profileDirty = true; }
@@ -96,6 +101,7 @@ class DefaultUI {
     void reloadProfiles();
 
     Driver *panelDriver = nullptr;
+    ConceptUI *conceptUI = nullptr;
     Controller *controller;
     PluginManager *pluginManager;
     ProfileManager *profileManager;
@@ -121,6 +127,7 @@ class DefaultUI {
     float currentTemp = 0.0f;
     float targetTemp = 0.0f;
     double bluetoothWeight = 0.0;
+    float brewElapsedSeconds = 0.0f;
     BrewScreenState brewScreenState = BrewScreenState::Brew;
 
     // EEZ Structs
