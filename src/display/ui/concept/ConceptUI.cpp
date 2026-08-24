@@ -1419,16 +1419,26 @@ void ConceptUI::applyStateGradient(int gradient, float fill) {
             }
             const float redDither =
                 (static_cast<float>(threshold[(y + x / 8) & 7][x & 7]) - 31.5f) / 64.0f;
-            // Use the same continuous ordered-dither path for every status.
-            // The previous non-red RGB565 quantiser introduced a visibly
-            // different horizontal colour zone on the physical blue panel.
-            // This is the renderer already validated for the red brew glow.
-            const float strength = LV_MIN(1.0f, glow * 3.0f);
-            const float noise = redDither * strength;
+            if (gradient == 3) {
+                const float strength = LV_MIN(1.0f, glow * 3.0f);
+                const float noise = redDither * strength;
+                stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_make(
+                    LV_CLAMP(0, static_cast<int>(red + noise * 16.0f), 255),
+                    LV_CLAMP(0, static_cast<int>(green + noise * 8.0f), 255),
+                    LV_CLAMP(0, static_cast<int>(blue + noise * 16.0f), 255));
+                continue;
+            }
+            const float dither = (static_cast<float>((x + y * 3) & 7) + 0.5f) / 8.0f;
+            const auto quantise = [dither](float value, int levels) {
+                const float scaled = LV_CLAMP(0.0f, value, 255.0f) * levels / 255.0f;
+                const int lower = static_cast<int>(scaled);
+                return LV_MIN(levels, lower + (dither < scaled - lower ? 1 : 0));
+            };
+            const int red5 = quantise(red, 31);
+            const int green6 = quantise(green, 63);
+            const int blue5 = quantise(blue, 31);
             stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_make(
-                LV_CLAMP(0, static_cast<int>(red + noise * 16.0f), 255),
-                LV_CLAMP(0, static_cast<int>(green + noise * 8.0f), 255),
-                LV_CLAMP(0, static_cast<int>(blue + noise * 16.0f), 255));
+                (red5 * 255 + 15) / 31, (green6 * 255 + 31) / 63, (blue5 * 255 + 15) / 31);
         }
     }
     // Publish only after every pixel is ready. Drawing and generation never
