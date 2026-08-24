@@ -72,6 +72,9 @@ class WebUIPlugin : public Plugin {
     long lastStatus = 0;
     long lastCleanup = 0;
     long lastDns = 0;
+    unsigned long lastOtaProgressAt = 0;
+    int lastOtaProgress = -1;
+    uint8_t lastOtaProgressPhase = 0xFF;
     bool updating = false;
     bool apMode = false;
     bool serverRunning = false;

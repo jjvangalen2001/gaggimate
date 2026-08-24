@@ -1012,6 +1012,22 @@ void WebUIPlugin::updateOTAProgress(uint8_t phase, int progress) {
     if (ws.getClients().empty()) {
         return;
     }
+
+    // Download callbacks arrive once per small network chunk. Broadcasting each
+    // callback can enqueue hundreds of duplicate WebSocket frames and exhaust
+    // AsyncWebSocket while the CPU is busy with TLS/BLE OTA. Keep phase changes
+    // and completion immediate, but rate-limit intermediate UI updates.
+    const unsigned long now = millis();
+    const bool phaseChanged = phase != lastOtaProgressPhase;
+    const bool completed = progress >= 100;
+    if (!phaseChanged && !completed &&
+        (progress == lastOtaProgress || now - lastOtaProgressAt < 250)) {
+        return;
+    }
+    lastOtaProgressPhase = phase;
+    lastOtaProgress = progress;
+    lastOtaProgressAt = now;
+
     JsonDocument doc(&psramAllocator);
     doc["tp"] = "evt:ota-progress";
     doc["phase"] = phase;
