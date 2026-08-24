@@ -484,8 +484,13 @@ void ConceptUI::init() {
     lv_obj_set_style_img_recolor(targetIcon, lv_color_hex(0x4a8cf0), 0);
     lv_obj_set_style_img_recolor_opa(targetIcon, LV_OPA_COVER, 0);
     secondaryValue = makeLabel(targetRow, &dm_sans_12, lv_color_hex(0x616161));
-    targetDot = makeLabel(targetRow, &dm_sans_11, lv_color_hex(0x242424));
-    lv_label_set_text(targetDot, "·");
+    targetDot = lv_obj_create(targetRow);
+    lv_obj_set_size(targetDot, 2, 2);
+    lv_obj_set_style_radius(targetDot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_border_width(targetDot, 0, 0);
+    lv_obj_set_style_bg_color(targetDot, lv_color_hex(0x242424), 0);
+    lv_obj_set_style_pad_all(targetDot, 0, 0);
+    lv_obj_clear_flag(targetDot, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     targetPressureIcon = lv_img_create(targetRow);
     lv_img_set_src(targetPressureIcon, &concept_pressure);
     lv_obj_set_style_img_recolor(targetPressureIcon, lv_color_hex(0x4a8cf0), 0);
@@ -1141,7 +1146,10 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_obj_set_style_text_color(mainValue, WHITE, 0);
         setLabelTextIfChanged(secondaryValue, secondary);
         lv_obj_set_style_img_recolor(targetIcon, lv_color_hex(accent), 0);
-        const bool showPressure = view == View::Brew && state.pressure > 0.3f;
+        // The overview is a temperature target screen. Sensor offset/noise can
+        // report pressure while idle, but pressure belongs to infusion/brew and
+        // must not make an extra icon, separator and bar value appear here.
+        const bool showPressure = false;
         setLabelTextFmtIfChanged(targetPressure, "%.1f bar", state.pressure);
         for (auto *obj : {targetDot, targetPressureIcon, targetPressure}) {
             if (showPressure) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
@@ -1411,35 +1419,16 @@ void ConceptUI::applyStateGradient(int gradient, float fill) {
             }
             const float redDither =
                 (static_cast<float>(threshold[(y + x / 8) & 7][x & 7]) - 31.5f) / 64.0f;
-            if (gradient == 3) {
-                // Preserve the exact brew renderer that was validated on the
-                // physical panel before the RGB565 experiments.
-                const float strength = LV_MIN(1.0f, glow * 3.0f);
-                const float noise = redDither * strength;
-                stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_make(
-                    LV_CLAMP(0, static_cast<int>(red + noise * 16.0f), 255),
-                    LV_CLAMP(0, static_cast<int>(green + noise * 8.0f), 255),
-                    LV_CLAMP(0, static_cast<int>(blue + noise * 16.0f), 255));
-                continue;
-            }
-            // Quantise to the two adjacent RGB565 levels instead of adding
-            // arbitrary 8-bit noise. A shared threshold keeps the hue stable:
-            // orange cannot acquire a green/blue contour and green cannot turn
-            // cyan. Every status follows this identical conversion path.
-            // Every physical row contains each threshold equally often (480
-            // is divisible by 8). Therefore the dither pattern cannot create
-            // a brighter or darker horizontal band of its own.
-            const float dither = (static_cast<float>((x + y * 3) & 7) + 0.5f) / 8.0f;
-            const auto quantise = [dither](float value, int levels) {
-                const float scaled = LV_CLAMP(0.0f, value, 255.0f) * levels / 255.0f;
-                const int lower = static_cast<int>(scaled);
-                return LV_MIN(levels, lower + (dither < scaled - lower ? 1 : 0));
-            };
-            const int red5 = quantise(red, 31);
-            const int green6 = quantise(green, 63);
-            const int blue5 = quantise(blue, 31);
+            // Use the same continuous ordered-dither path for every status.
+            // The previous non-red RGB565 quantiser introduced a visibly
+            // different horizontal colour zone on the physical blue panel.
+            // This is the renderer already validated for the red brew glow.
+            const float strength = LV_MIN(1.0f, glow * 3.0f);
+            const float noise = redDither * strength;
             stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_make(
-                (red5 * 255 + 15) / 31, (green6 * 255 + 31) / 63, (blue5 * 255 + 15) / 31);
+                LV_CLAMP(0, static_cast<int>(red + noise * 16.0f), 255),
+                LV_CLAMP(0, static_cast<int>(green + noise * 8.0f), 255),
+                LV_CLAMP(0, static_cast<int>(blue + noise * 16.0f), 255));
         }
     }
     // Publish only after every pixel is ready. Drawing and generation never
