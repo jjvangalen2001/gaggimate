@@ -345,10 +345,20 @@ void ConceptUI::init() {
     lv_obj_add_event_cb(root, eventCallback, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(root, eventCallback, LV_EVENT_RELEASED, this);
 
+    for (int i = 0; i < 2; i++) {
+        stateBackgroundPixels[i] = static_cast<lv_color_t *>(ps_malloc(SCREEN_SIZE * 240 * sizeof(lv_color_t)));
+        assert(stateBackgroundPixels[i] != nullptr);
+        stateBackgroundImages[i].header.cf = LV_IMG_CF_TRUE_COLOR;
+        stateBackgroundImages[i].header.w = SCREEN_SIZE;
+        stateBackgroundImages[i].header.h = 240;
+        stateBackgroundImages[i].data_size = SCREEN_SIZE * 240 * sizeof(lv_color_t);
+        stateBackgroundImages[i].data = reinterpret_cast<const uint8_t *>(stateBackgroundPixels[i]);
+    }
     stateBackground = lv_img_create(root);
-    lv_img_set_src(stateBackground, &concept_bg_heating);
+    lv_img_set_src(stateBackground, &stateBackgroundImages[activeBackgroundBuffer]);
     lv_obj_align(stateBackground, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_clear_flag(stateBackground, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    applyStateGradient(0);
 
     buildRing();
 
@@ -588,6 +598,12 @@ void ConceptUI::init() {
     brandMate = makeLabel(root, &dm_sans_30_light, lv_color_hex(0xa6a6a6));
     lv_label_set_text(brandMate, "MATE");
     lv_obj_align(brandMate, LV_ALIGN_CENTER, 52, 0);
+    standbyError = makeLabel(root, &dm_sans_11, lv_color_hex(0x9a4040));
+    lv_label_set_long_mode(standbyError, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(standbyError, 250);
+    lv_obj_set_style_text_align(standbyError, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(standbyError, LV_ALIGN_CENTER, 0, 67);
+    lv_obj_add_flag(standbyError, LV_OBJ_FLAG_HIDDEN);
 
     standbyClock = makeLabel(root, &dm_mono_13, lv_color_hex(0x454545));
     lv_label_set_text(standbyClock, "--:--");
@@ -666,8 +682,6 @@ void ConceptUI::init() {
     lv_obj_align(standbyHint, LV_ALIGN_BOTTOM_MID, 0, -62);
 
     standbyEnteredAt = lv_tick_get();
-    lv_timer_create(faceTimerCallback, 80, this);
-
     buildMenu();
 
     standbyButton = lv_btn_create(root);
@@ -736,10 +750,10 @@ void ConceptUI::setEditing(bool enabled) {
 void ConceptUI::buildRing() {
     for (int i = 0; i < 80; i++) {
         const float angle = (i * 360.0f / 80.0f - 90.0f) * static_cast<float>(M_PI) / 180.0f;
-        const int x1 = SCREEN_SIZE / 2 + static_cast<int>(std::cos(angle) * (RING_RADIUS - RING_TICK_LENGTH));
-        const int y1 = SCREEN_SIZE / 2 + static_cast<int>(std::sin(angle) * (RING_RADIUS - RING_TICK_LENGTH));
-        const int x2 = SCREEN_SIZE / 2 + static_cast<int>(std::cos(angle) * RING_RADIUS);
-        const int y2 = SCREEN_SIZE / 2 + static_cast<int>(std::sin(angle) * RING_RADIUS);
+        const int x1 = SCREEN_SIZE / 2 + static_cast<int>(std::lround(std::cos(angle) * (RING_RADIUS - RING_TICK_LENGTH)));
+        const int y1 = SCREEN_SIZE / 2 + static_cast<int>(std::lround(std::sin(angle) * (RING_RADIUS - RING_TICK_LENGTH)));
+        const int x2 = SCREEN_SIZE / 2 + static_cast<int>(std::lround(std::cos(angle) * RING_RADIUS));
+        const int y2 = SCREEN_SIZE / 2 + static_cast<int>(std::lround(std::sin(angle) * RING_RADIUS));
         const int minX = LV_MIN(x1, x2);
         const int minY = LV_MIN(y1, y2);
         tickPoints[i][0].x = x1 - minX;
@@ -841,7 +855,7 @@ void ConceptUI::applyView() {
     const bool standby = view == View::Standby;
     const bool menu = view == View::Menu;
     const bool status = view == View::Status;
-    for (auto *obj : {brand, brandMate, standbyClock, standbyProfileRow, standbyHint}) {
+    for (auto *obj : {brand, brandMate, standbyError, standbyClock, standbyProfileRow, standbyHint}) {
         if (standby) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
     }
@@ -904,11 +918,42 @@ void ConceptUI::applyView() {
     lv_obj_align(connection, LV_ALIGN_TOP_MID, 0, 44);
 }
 
-void ConceptUI::update(const ConceptUIState &state) {
+void ConceptUI::update(const ConceptUIState &inputState) {
     // EEZ's generated standby flow can still advance its own screen after the
     // initial change. Keep the concept root authoritative so that transition
     // can never expose the generated black/original screen underneath it.
     if (root != nullptr && lv_scr_act() != root) lv_scr_load(root);
+    ConceptUIState state = inputState;
+    const bool controllerConnected = controller->getClientController()->isConnected();
+    if (controllerConnected) standalonePreview = false;
+    if (standalonePreview && !controllerConnected) {
+        const float elapsed = lv_tick_elaps(standalonePreviewStartedAt) / 1000.0f;
+        const float frozenElapsed = LV_MIN(elapsed, 13.0f);
+        state.temperature = 93.0f;
+        state.targetTemperature = 93.0f;
+        state.temperatureStable = true;
+        state.error = false;
+        state.elapsedSeconds = frozenElapsed;
+        state.elapsedPercentage = 1.0f;
+        state.preview = true;
+        if (elapsed < 3.0f) {
+            state.phase = "INFUSION";
+            state.pressure = 2.5f * elapsed / 3.0f;
+            state.weight = 0.0f;
+        } else if (elapsed < 13.0f) {
+            state.phase = "BREW";
+            const float brewElapsed = elapsed - 3.0f;
+            if (brewElapsed < 2.0f) state.pressure = 2.5f + brewElapsed * 3.25f;
+            else if (brewElapsed < 8.0f) state.pressure = 9.0f;
+            else state.pressure = 9.0f * (1.0f - (brewElapsed - 8.0f) / 2.0f);
+            state.weight = brewElapsed * 2.5f;
+        } else {
+            state.phase = "COMPLETE";
+            state.pressure = 0.0f;
+            state.weight = 25.0f;
+            state.processComplete = true;
+        }
+    }
     lastState = state;
     const float tempRatio = state.targetTemperature > 0 ? state.temperature / state.targetTemperature : 0.0f;
     // Simple-pump profiles have no controller pressure target even though a
@@ -917,19 +962,24 @@ void ConceptUI::update(const ConceptUIState &state) {
     const float pressureScale = state.targetPressure > 0.1f ? state.targetPressure : 10.0f;
     const float pressureRatio = state.pressure / pressureScale;
     updateRing(tempRatio, pressureRatio);
-    const lv_img_dsc_t *background = &concept_bg_heating;
+    int gradient = 0;
     if (view == View::Status) {
         lv_obj_clear_flag(mainDecimal, LV_OBJ_FLAG_HIDDEN);
-        if (state.processComplete) background = &concept_bg_done;
+        if (state.processComplete) gradient = 4;
         else {
             char phaseUpper[32]; uppercaseCopy(phaseUpper, sizeof(phaseUpper), state.phase);
-            background = std::strstr(phaseUpper, "INFUS") != nullptr ? &concept_bg_preinfuse : &concept_bg_brewing;
+            gradient = std::strstr(phaseUpper, "INFUS") != nullptr ? 2 : 3;
         }
-    } else if (view == View::Brew) background = state.temperatureStable ? &concept_bg_ready : &concept_bg_heating;
-    else if (view == View::Steam) background = &concept_bg_steam;
-    else if (view == View::Water) background = &concept_bg_water;
-    else if (view == View::Grind) background = &concept_bg_grind;
-    setImageSourceIfChanged(stateBackground, background);
+    } else if (view == View::Brew) gradient = state.temperatureStable ? 1 : 0;
+    else if (view == View::Steam) gradient = 5;
+    else if (view == View::Water) gradient = 6;
+    else if (view == View::Grind) gradient = 7;
+    float gradientFill = 1.0f;
+    if (view == View::Brew && !state.temperatureStable) {
+        const float temperatureRatio = state.targetTemperature > 0.0f ? state.temperature / state.targetTemperature : 0.0f;
+        gradientFill = LV_CLAMP(0.12f, temperatureRatio, 1.0f);
+    }
+    applyStateGradient(gradient, gradientFill);
     if (view != View::Standby && view != View::Menu) lv_obj_clear_flag(stateBackground, LV_OBJ_FLAG_HIDDEN);
     updateHeatingGradient();
     setLabelTextFmtIfChanged(connection, "%s  %s", state.wifi ? "WiFi" : "--", state.connected ? "BT" : "--");
@@ -940,15 +990,12 @@ void ConceptUI::update(const ConceptUIState &state) {
         if (local != nullptr) setLabelTextFmtIfChanged(standbyClock, "%02d:%02d", local->tm_hour, local->tm_min);
         setLabelTextIfChanged(standbyProfile, safeText(state.profile, "ESPRESSO"));
         setLabelTextFmtIfChanged(standbyProfileTemp, "%.0f°C", state.targetTemperature);
-        if (state.error) {
-            setLabelTextIfChanged(brand, safeText(state.errorLabel, "SYSTEM ERROR"));
-            lv_obj_set_style_text_font(brand, &lv_font_montserrat_20, 0);
-            lv_obj_set_style_text_color(brand, lv_color_hex(0xd82828), 0);
-        } else {
-            setLabelTextIfChanged(brand, "GAGGI");
-            lv_obj_set_style_text_font(brand, &dm_sans_30_bold, 0);
-            lv_obj_set_style_text_color(brand, WHITE, 0);
-        }
+        setLabelTextIfChanged(brand, "GAGGI");
+        lv_obj_set_style_text_font(brand, &dm_sans_30_bold, 0);
+        lv_obj_set_style_text_color(brand, WHITE, 0);
+        setLabelTextIfChanged(standbyError, state.error ? safeText(state.errorLabel, "SYSTEM ERROR") : "");
+        if (state.error) lv_obj_clear_flag(standbyError, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(standbyError, LV_OBJ_FLAG_HIDDEN);
         return;
     }
     if (view == View::Menu) {
@@ -1282,12 +1329,10 @@ void ConceptUI::renderCompleteChart() {
             points[i] = static_cast<lv_coord_t>(pressureHistory[left] * (1.0f - mix) + pressureHistory[right] * mix);
         }
     }
+    // Live sampling advances LVGL's circular series origin. The completed
+    // history above is chronological, so point 0 must be drawn at the left.
+    lv_chart_set_x_start_point(chart, pressureSeries, 0);
     lv_chart_refresh(chart);
-}
-
-void ConceptUI::faceTimerCallback(lv_timer_t *timer) {
-    auto *self = static_cast<ConceptUI *>(timer->user_data);
-    self->updateStandbyFace();
 }
 
 void ConceptUI::updateRing(float temperatureRatio, float pressureRatio) {
@@ -1318,17 +1363,96 @@ void ConceptUI::updateRing(float temperatureRatio, float pressureRatio) {
     }
 }
 
-void ConceptUI::updateHeatingGradient() {
-    // The Figma glow is a background layer, never a temperature-shaped mask.
-    // Heating only adds a very slow, subtle breath without changing its bounds,
-    // so controls, graphs and text always remain cleanly above the gradient.
-    if (view == View::Brew && !lastState.temperatureStable) {
-        const float time = static_cast<float>(lv_tick_get() % 6200u) / 6200.0f * 2.0f * static_cast<float>(M_PI);
-        lv_obj_set_style_img_opa(stateBackground,
-                                 static_cast<lv_opa_t>(246 + 9 * (0.5f + 0.5f * std::sin(time))), 0);
-    } else {
-        lv_obj_set_style_img_opa(stateBackground, LV_OPA_COVER, 0);
+void ConceptUI::applyStateGradient(int gradient, float fill) {
+    const uint8_t fillStep = static_cast<uint8_t>(LV_CLAMP(0, static_cast<int>(std::lround(fill * 100.0f)), 100));
+    if (gradient == renderedGradient && fillStep == renderedGradientFill) return;
+    renderedGradient = gradient;
+    renderedGradientFill = fillStep;
+    const uint8_t nextBuffer = activeBackgroundBuffer ^ 1U;
+    // Figma glow colors after compositing each status' opacity over #050505.
+    static constexpr uint8_t targets[8][3] = {
+        {9, 66, 86}, {9, 66, 86}, {86, 35, 2}, {101, 7, 7},
+        {10, 69, 31}, {10, 46, 102}, {10, 49, 98}, {82, 57, 7},
+    };
+    // Keep the proven ordered pattern for brew. The other hues use a
+    // decorrelated threshold below: repeating Bayer rows were visible as a
+    // yellow/green/cyan band on the physical RGB565 panel.
+    static constexpr uint8_t threshold[8][8] = {
+        {0, 32, 8, 40, 2, 34, 10, 42}, {48, 16, 56, 24, 50, 18, 58, 26},
+        {12, 44, 4, 36, 14, 46, 6, 38}, {60, 28, 52, 20, 62, 30, 54, 22},
+        {3, 35, 11, 43, 1, 33, 9, 41}, {51, 19, 59, 27, 49, 17, 57, 25},
+        {15, 47, 7, 39, 13, 45, 5, 37}, {63, 31, 55, 23, 61, 29, 53, 21},
+    };
+    // The glow fades into actual panel black. Quantising or dithering the
+    // background itself creates a visible light contour before the glow.
+    constexpr float base[3] = {0.0f, 0.0f, 0.0f};
+    for (int y = 0; y < 240; y++) {
+        const float screenY = static_cast<float>(y + 240);
+        const float vertical = (480.0f - screenY) / 170.0f;
+        const float revealTop = 480.0f - 240.0f * fillStep / 100.0f;
+        for (int x = 0; x < SCREEN_SIZE; x++) {
+            const float horizontal = (static_cast<float>(x) - 239.5f) / 312.0f;
+            const float distance = std::sqrt(horizontal * horizontal + vertical * vertical);
+            const float radialGlow = LV_MAX(0.0f, 1.0f - distance);
+            // During heating the glow rises with temperature, but its leading
+            // edge fades across 42 px instead of exposing a hard horizontal cut.
+            float reveal = 1.0f;
+            if (fillStep < 100) {
+                reveal = LV_CLAMP(0.0f, (screenY - (revealTop - 42.0f)) / 42.0f, 1.0f);
+                reveal = reveal * reveal * (3.0f - 2.0f * reveal);
+            }
+            const float glow = radialGlow * reveal;
+            const float red = base[0] + (targets[gradient][0] - base[0]) * glow;
+            const float green = base[1] + (targets[gradient][1] - base[1]) * glow;
+            const float blue = base[2] + (targets[gradient][2] - base[2]) * glow;
+            if (glow <= 0.012f) {
+                stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_black();
+                continue;
+            }
+            const float redDither =
+                (static_cast<float>(threshold[(y + x / 8) & 7][x & 7]) - 31.5f) / 64.0f;
+            if (gradient == 3) {
+                // Preserve the exact brew renderer that was validated on the
+                // physical panel before the RGB565 experiments.
+                const float strength = LV_MIN(1.0f, glow * 3.0f);
+                const float noise = redDither * strength;
+                stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_make(
+                    LV_CLAMP(0, static_cast<int>(red + noise * 16.0f), 255),
+                    LV_CLAMP(0, static_cast<int>(green + noise * 8.0f), 255),
+                    LV_CLAMP(0, static_cast<int>(blue + noise * 16.0f), 255));
+                continue;
+            }
+            // Quantise to the two adjacent RGB565 levels instead of adding
+            // arbitrary 8-bit noise. A shared threshold keeps the hue stable:
+            // orange cannot acquire a green/blue contour and green cannot turn
+            // cyan. Every status follows this identical conversion path.
+            // Every physical row contains each threshold equally often (480
+            // is divisible by 8). Therefore the dither pattern cannot create
+            // a brighter or darker horizontal band of its own.
+            const float dither = (static_cast<float>((x + y * 3) & 7) + 0.5f) / 8.0f;
+            const auto quantise = [dither](float value, int levels) {
+                const float scaled = LV_CLAMP(0.0f, value, 255.0f) * levels / 255.0f;
+                const int lower = static_cast<int>(scaled);
+                return LV_MIN(levels, lower + (dither < scaled - lower ? 1 : 0));
+            };
+            const int red5 = quantise(red, 31);
+            const int green6 = quantise(green, 63);
+            const int blue5 = quantise(blue, 31);
+            stateBackgroundPixels[nextBuffer][y * SCREEN_SIZE + x] = lv_color_make(
+                (red5 * 255 + 15) / 31, (green6 * 255 + 31) / 63, (blue5 * 255 + 15) / 31);
+        }
     }
+    // Publish only after every pixel is ready. Drawing and generation never
+    // touch the same PSRAM buffer, preventing a half-old/half-new flash.
+    lv_img_cache_invalidate_src(&stateBackgroundImages[nextBuffer]);
+    lv_img_set_src(stateBackground, &stateBackgroundImages[nextBuffer]);
+    activeBackgroundBuffer = nextBuffer;
+}
+
+void ConceptUI::updateHeatingGradient() {
+    // Keep the native gradient fully opaque. Blending a pre-quantized layer
+    // creates a second RGB565 quantisation pass and reintroduces banding.
+    lv_obj_set_style_opa(stateBackground, LV_OPA_COVER, 0);
 }
 
 void ConceptUI::updatePrimaryButton() {
@@ -1355,6 +1479,11 @@ void ConceptUI::updatePrimaryButton() {
 
 void ConceptUI::handlePrimary() {
     if (view == View::Status) {
+        if (standalonePreview) {
+            standalonePreview = false;
+            show(SCREEN_ID_BREW_SCREEN);
+            return;
+        }
         if (lastState.processComplete) {
             controller->clear();
             owner->changeScreen(SCREEN_ID_BREW_SCREEN);
@@ -1363,6 +1492,16 @@ void ConceptUI::handlePrimary() {
             controller->clear();
         }
     } else if (view == View::Brew) {
+        if (!controller->getClientController()->isConnected()) {
+            standalonePreview = true;
+            standalonePreviewStartedAt = lv_tick_get();
+            // The generated EEZ status flow has no active script while the
+            // controller is absent and asserts in stopScript(). Standalone
+            // preview is entirely native ConceptUI, so switch its view
+            // directly without touching EEZ's state machine.
+            show(SCREEN_ID_STATUS_SCREEN);
+            return;
+        }
         controller->activate();
     } else if (view == View::Water) {
         controller->isActive() ? controller->deactivate() : controller->activate();

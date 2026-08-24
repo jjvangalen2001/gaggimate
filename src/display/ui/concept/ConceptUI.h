@@ -102,8 +102,14 @@ class ConceptUI {
     DefaultUI *owner;
     lv_obj_t *root = nullptr;
     lv_obj_t *stateBackground = nullptr;
+    lv_color_t *stateBackgroundPixels[2] = {nullptr, nullptr};
+    lv_img_dsc_t stateBackgroundImages[2]{};
+    uint8_t activeBackgroundBuffer = 0;
+    int renderedGradient = -1;
+    uint8_t renderedGradientFill = 0xff;
     lv_obj_t *brand = nullptr;
     lv_obj_t *brandMate = nullptr;
+    lv_obj_t *standbyError = nullptr;
     lv_obj_t *standbyClock = nullptr;
     lv_obj_t *standbyProfileRow = nullptr;
     lv_obj_t *standbyTargetIcon = nullptr;
@@ -189,11 +195,14 @@ class ConceptUI {
     int renderedPressureTicks = -1;
     uint8_t renderedPrimaryState = 0xff;
     bool mainLayoutDirty = true;
+    bool standalonePreview = false;
+    uint32_t standalonePreviewStartedAt = 0;
     void buildRing();
     void buildMenu();
     void applyView();
     void setMode(View next);
     void updateRing(float temperatureRatio, float pressureRatio);
+    void applyStateGradient(int gradient, float fill = 1.0f);
     void updateHeatingGradient();
     void renderCompleteChart();
     void updatePrimaryButton();
@@ -204,7 +213,6 @@ class ConceptUI {
     void handleGesture(lv_dir_t direction);
     void updateStandbyFace();
     static void eventCallback(lv_event_t *event);
-    static void faceTimerCallback(lv_timer_t *timer);
 };
 
 #endif
