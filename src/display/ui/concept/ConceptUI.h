@@ -12,6 +12,7 @@ LV_FONT_DECLARE(dm_sans_88_bold);
 LV_FONT_DECLARE(dm_sans_30);
 LV_FONT_DECLARE(dm_sans_38);
 LV_FONT_DECLARE(dm_sans_16_light);
+LV_FONT_DECLARE(dm_sans_16_medium);
 LV_FONT_DECLARE(dm_sans_10_units);
 LV_FONT_DECLARE(dm_sans_14);
 LV_FONT_DECLARE(dm_sans_9);
@@ -22,6 +23,8 @@ LV_FONT_DECLARE(dm_sans_13);
 LV_FONT_DECLARE(dm_sans_11);
 LV_FONT_DECLARE(dm_sans_30_bold);
 LV_FONT_DECLARE(dm_sans_30_light);
+LV_FONT_DECLARE(dm_sans_36_bold);
+LV_FONT_DECLARE(dm_sans_36_light);
 LV_FONT_DECLARE(dm_mono_12);
 LV_FONT_DECLARE(dm_mono_9);
 LV_FONT_DECLARE(dm_mono_13);
@@ -84,6 +87,7 @@ struct ConceptUIState {
     bool error = false;
     bool processComplete = false;
     bool volumetric = false;
+    bool volumetricAvailable = false;
     bool preview = false;
 };
 
@@ -164,6 +168,7 @@ class ConceptUI {
     lv_obj_t *editPanel = nullptr;
     lv_obj_t *editButtons[4] = {nullptr};
     lv_obj_t *editTempValue = nullptr;
+    lv_obj_t *editTargetName = nullptr;
     lv_obj_t *editTargetValue = nullptr;
     lv_obj_t *editDoneButton = nullptr;
     lv_obj_t *grindTargetRow = nullptr;

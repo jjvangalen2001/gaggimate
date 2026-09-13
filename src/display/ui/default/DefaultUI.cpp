@@ -303,8 +303,9 @@ void DefaultUI::loop() {
             conceptState.elapsed = brewProcess.elapsed_time();
             conceptState.phase = brewProcess.phase_type();
             conceptState.profile = selectedProfileInfo.name();
-            conceptState.brewTarget = selectedProfileInfo.is_volumetric() ? "" : selectedProfileInfo.time();
-            conceptState.volumetric = selectedProfileInfo.is_volumetric();
+            conceptState.volumetricAvailable = controller->isVolumetricAvailable();
+            conceptState.volumetric = selectedProfileInfo.is_volumetric() && conceptState.volumetricAvailable;
+            conceptState.brewTarget = conceptState.volumetric ? "" : selectedProfileInfo.time();
             if (conceptState.volumetric) {
                 static char conceptWeightTarget[20];
                 snprintf(conceptWeightTarget, sizeof(conceptWeightTarget), "%.1f g", selectedProfileInfo.target_weight());

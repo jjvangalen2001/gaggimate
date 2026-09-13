@@ -1,6 +1,8 @@
 #include "ConceptUI.h"
 
 #include <WiFi.h>
+#include <esp32-hal-psram.h>
+#include <cassert>
 #include <cstdarg>
 #include <cmath>
 #include <cctype>
@@ -41,6 +43,14 @@ bool setLabelTextFmtIfChanged(lv_obj_t *label, const char *format, ...) {
 
 void setImageSourceIfChanged(lv_obj_t *image, const lv_img_dsc_t *source) {
     if (lv_img_get_src(image) != source) lv_img_set_src(image, source);
+}
+
+void setTextFontIfChanged(lv_obj_t *label, const lv_font_t *font) {
+    if (lv_obj_get_style_text_font(label, LV_PART_MAIN) != font) lv_obj_set_style_text_font(label, font, 0);
+}
+
+void setTextColorIfChanged(lv_obj_t *label, lv_color_t color) {
+    if (lv_obj_get_style_text_color(label, LV_PART_MAIN).full != color.full) lv_obj_set_style_text_color(label, color, 0);
 }
 
 void uppercaseCopy(char *destination, size_t size, const char *source) {
@@ -366,7 +376,7 @@ void ConceptUI::init() {
     lv_obj_align(connection, LV_ALIGN_TOP_MID, 0, 32);
     connectionIcons = lv_obj_create(root);
     lv_obj_set_size(connectionIcons, 44, 16);
-    lv_obj_align(connectionIcons, LV_ALIGN_TOP_MID, 0, 54);
+    lv_obj_align(connectionIcons, LV_ALIGN_TOP_MID, 0, 72);
     lv_obj_set_style_bg_opa(connectionIcons, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(connectionIcons, 0, 0);
     lv_obj_set_style_pad_all(connectionIcons, 0, 0);
@@ -392,14 +402,18 @@ void ConceptUI::init() {
     profileLeft = lv_img_create(profileRow);
     lv_img_set_src(profileLeft, &concept_profile_left);
     lv_obj_set_style_img_opa(profileLeft, 46, 0);
-    modeLabel = makeLabel(profileRow, &dm_sans_12_bold, lv_color_hex(0x9a9a9a));
+    modeLabel = makeLabel(profileRow, &dm_sans_16_medium, lv_color_hex(0x8c8c8c));
+    lv_obj_set_width(modeLabel, 196);
+    lv_label_set_long_mode(modeLabel, LV_LABEL_LONG_SCROLL);
+    lv_obj_set_style_text_align(modeLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_letter_space(modeLabel, 2, 0);
+    lv_obj_set_style_anim_speed(modeLabel, 18, 0);
     profileRight = lv_img_create(profileRow);
     lv_img_set_src(profileRight, &concept_profile_right);
     lv_obj_set_style_img_opa(profileRight, 46, 0);
 
     stateRow = lv_obj_create(root);
-    lv_obj_set_size(stateRow, 150, 18);
+    lv_obj_set_size(stateRow, 190, 22);
     lv_obj_align(stateRow, LV_ALIGN_TOP_MID, 0, 80);
     lv_obj_set_style_bg_opa(stateRow, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(stateRow, 0, 0);
@@ -420,7 +434,7 @@ void ConceptUI::init() {
     lv_anim_set_time(&spinnerAnimation, 1100);
     lv_anim_set_repeat_count(&spinnerAnimation, LV_ANIM_REPEAT_INFINITE);
     lv_anim_start(&spinnerAnimation);
-    stateLabel = makeLabel(stateRow, &dm_mono_9, lv_color_hex(0x4a8cf0));
+    stateLabel = makeLabel(stateRow, &dm_sans_12, lv_color_hex(0x4a8cf0));
     lv_obj_set_style_text_letter_space(stateLabel, 1, 0);
 
     contextIcon = lv_img_create(root);
@@ -461,8 +475,6 @@ void ConceptUI::init() {
 
     mainValue = makeLabel(root, &dm_sans_88_bold, WHITE);
     lv_obj_align(mainValue, LV_ALIGN_CENTER, -18, 0);
-    lv_obj_add_flag(mainValue, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(mainValue, eventCallback, LV_EVENT_CLICKED, this);
 
     mainDecimal = makeLabel(root, &dm_sans_38, lv_color_hex(0x888b91));
     lv_label_set_text(mainDecimal, ".0");
@@ -470,7 +482,7 @@ void ConceptUI::init() {
     lv_label_set_text(mainUnit, "°C");
 
     targetRow = lv_obj_create(root);
-    lv_obj_set_size(targetRow, 240, 18);
+    lv_obj_set_size(targetRow, 240, 22);
     lv_obj_align(targetRow, LV_ALIGN_TOP_MID, 0, 300);
     lv_obj_set_style_bg_opa(targetRow, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(targetRow, 0, 0);
@@ -481,9 +493,12 @@ void ConceptUI::init() {
     lv_obj_clear_flag(targetRow, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
     targetIcon = lv_img_create(targetRow);
     lv_img_set_src(targetIcon, &concept_target);
+    lv_img_set_zoom(targetIcon, 320);
     lv_obj_set_style_img_recolor(targetIcon, lv_color_hex(0x4a8cf0), 0);
     lv_obj_set_style_img_recolor_opa(targetIcon, LV_OPA_COVER, 0);
-    secondaryValue = makeLabel(targetRow, &dm_sans_12, lv_color_hex(0x616161));
+    secondaryValue = makeLabel(targetRow, &dm_sans_16_medium, lv_color_hex(0x616161));
+    lv_obj_add_flag(secondaryValue, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(secondaryValue, eventCallback, LV_EVENT_CLICKED, this);
     targetDot = lv_obj_create(targetRow);
     lv_obj_set_size(targetDot, 2, 2);
     lv_obj_set_style_radius(targetDot, LV_RADIUS_CIRCLE, 0);
@@ -497,7 +512,7 @@ void ConceptUI::init() {
     lv_obj_set_style_img_recolor_opa(targetPressureIcon, LV_OPA_COVER, 0);
     targetPressure = makeLabel(targetRow, &dm_sans_12, lv_color_hex(0x616161));
 
-    phaseLabel = makeLabel(root, &dm_mono_9, lv_color_hex(0xd82828));
+    phaseLabel = makeLabel(root, &dm_sans_16_medium, lv_color_hex(0xd82828));
     lv_obj_set_style_text_letter_space(phaseLabel, 2, 0);
     lv_obj_align(phaseLabel, LV_ALIGN_TOP_MID, 0, 61);
 
@@ -559,50 +574,61 @@ void ConceptUI::init() {
     lv_obj_align(swipeUpHint, LV_ALIGN_BOTTOM_MID, 0, -45);
 
     editPanel = lv_obj_create(root);
-    lv_obj_set_size(editPanel, 285, 185);
-    lv_obj_align(editPanel, LV_ALIGN_CENTER, 0, 4);
+    lv_obj_set_size(editPanel, SCREEN_SIZE, SCREEN_SIZE);
+    lv_obj_set_pos(editPanel, 0, 0);
     lv_obj_set_style_bg_opa(editPanel, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(editPanel, 0, 0);
+    lv_obj_set_style_pad_all(editPanel, 0, 0);
     lv_obj_clear_flag(editPanel, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_t *tempName = makeLabel(editPanel, &dm_sans_9, lv_color_hex(0x777777));
-    lv_label_set_text(tempName, "TEMP");
-    lv_obj_align(tempName, LV_ALIGN_TOP_LEFT, 5, 18);
-    lv_obj_t *targetName = makeLabel(editPanel, &dm_sans_9, lv_color_hex(0x777777));
-    lv_label_set_text(targetName, "TARGET");
-    lv_obj_align(targetName, LV_ALIGN_TOP_LEFT, 5, 83);
-    editTempValue = makeLabel(editPanel, &lv_font_montserrat_18, WHITE);
-    lv_obj_align(editTempValue, LV_ALIGN_TOP_MID, 30, 16);
-    editTargetValue = makeLabel(editPanel, &lv_font_montserrat_18, WHITE);
-    lv_obj_align(editTargetValue, LV_ALIGN_TOP_MID, 30, 81);
+    static const char *editNames[] = {"TEMP", "WEIGHT"};
+    for (int row = 0; row < 2; row++) {
+        lv_obj_t *name = makeLabel(editPanel, &dm_sans_16_medium, lv_color_hex(0x737373));
+        lv_label_set_text(name, editNames[row]);
+        lv_obj_set_style_text_letter_space(name, 1, 0);
+        lv_obj_set_size(name, 80, 22);
+        lv_obj_set_pos(name, 130, 197 + row * 42);
+        if (row == 1) editTargetName = name;
+    }
+    editTempValue = makeLabel(editPanel, &dm_sans_16_medium, lv_color_hex(0xcccccc));
+    editTargetValue = makeLabel(editPanel, &dm_sans_16_medium, lv_color_hex(0xcccccc));
+    lv_obj_t *editValues[] = {editTempValue, editTargetValue};
+    for (int row = 0; row < 2; row++) {
+        lv_obj_set_size(editValues[row], 62, 22);
+        lv_obj_set_style_text_align(editValues[row], LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_pos(editValues[row], 248, 197 + row * 42);
+    }
     for (int i = 0; i < 4; i++) {
         editButtons[i] = lv_btn_create(editPanel);
-        makeRoundButton(editButtons[i], 38);
         const int row = i / 2;
         const int side = i % 2;
-        lv_obj_align(editButtons[i], LV_ALIGN_TOP_LEFT, 78 + side * 153, 7 + row * 65);
+        lv_obj_set_size(editButtons[i], 38, 38);
+        lv_obj_set_pos(editButtons[i], 210 + side * 102, 189 + row * 42);
+        lv_obj_set_style_bg_opa(editButtons[i], LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(editButtons[i], 0, 0);
+        lv_obj_set_style_shadow_width(editButtons[i], 0, 0);
+        lv_obj_set_style_pad_all(editButtons[i], 0, 0);
         lv_obj_add_event_cb(editButtons[i], eventCallback, LV_EVENT_CLICKED, this);
-        lv_obj_t *sign = makeLabel(editButtons[i], &lv_font_montserrat_18, WHITE);
+        lv_obj_t *sign = makeLabel(editButtons[i], &lv_font_montserrat_20, lv_color_hex(0xa6a6a6));
         lv_label_set_text(sign, side == 0 ? "-" : "+");
         lv_obj_center(sign);
     }
     editDoneButton = lv_btn_create(editPanel);
-    lv_obj_set_size(editDoneButton, 90, 36);
-    lv_obj_align(editDoneButton, LV_ALIGN_BOTTOM_MID, 0, -2);
-    lv_obj_set_style_radius(editDoneButton, 18, 0);
-    lv_obj_set_style_bg_color(editDoneButton, lv_color_hex(0x141414), 0);
-    lv_obj_set_style_border_width(editDoneButton, 1, 0);
-    lv_obj_set_style_border_color(editDoneButton, lv_color_hex(0x555555), 0);
+    makeRoundButton(editDoneButton, 50);
+    lv_obj_set_pos(editDoneButton, 215, 347);
     lv_obj_add_event_cb(editDoneButton, eventCallback, LV_EVENT_CLICKED, this);
-    lv_obj_t *doneLabel = makeLabel(editDoneButton, &dm_sans_9, lv_color_hex(0xaaaaaa));
-    lv_label_set_text(doneLabel, "DONE");
-    lv_obj_center(doneLabel);
+    lv_obj_t *doneIcon = lv_img_create(editDoneButton);
+    lv_img_set_src(doneIcon, &concept_up_hint);
+    lv_img_set_zoom(doneIcon, 384);
+    lv_obj_set_style_img_recolor(doneIcon, lv_color_hex(0x777777), 0);
+    lv_obj_set_style_img_recolor_opa(doneIcon, LV_OPA_COVER, 0);
+    lv_obj_center(doneIcon);
 
-    brand = makeLabel(root, &dm_sans_30_bold, WHITE);
+    brand = makeLabel(root, &dm_sans_36_bold, WHITE);
     lv_label_set_text(brand, "GAGGI");
-    lv_obj_align(brand, LV_ALIGN_CENTER, -43, 0);
-    brandMate = makeLabel(root, &dm_sans_30_light, lv_color_hex(0xa6a6a6));
+    lv_obj_align(brand, LV_ALIGN_CENTER, -43, -14);
+    brandMate = makeLabel(root, &dm_sans_36_light, lv_color_hex(0xa6a6a6));
     lv_label_set_text(brandMate, "MATE");
-    lv_obj_align(brandMate, LV_ALIGN_CENTER, 52, 0);
+    lv_obj_align(brandMate, LV_ALIGN_CENTER, 52, -14);
     standbyError = makeLabel(root, &dm_sans_11, lv_color_hex(0x9a4040));
     lv_label_set_long_mode(standbyError, LV_LABEL_LONG_DOT);
     lv_obj_set_width(standbyError, 250);
@@ -612,10 +638,10 @@ void ConceptUI::init() {
 
     standbyClock = makeLabel(root, &dm_mono_13, lv_color_hex(0x454545));
     lv_label_set_text(standbyClock, "--:--");
-    lv_obj_align(standbyClock, LV_ALIGN_TOP_MID, 0, 78);
+    lv_obj_align(standbyClock, LV_ALIGN_TOP_MID, 0, 99);
     standbyProfileRow = lv_obj_create(root);
-    lv_obj_set_size(standbyProfileRow, 220, 18);
-    lv_obj_align(standbyProfileRow, LV_ALIGN_CENTER, 0, 35);
+    lv_obj_set_size(standbyProfileRow, 280, 22);
+    lv_obj_align(standbyProfileRow, LV_ALIGN_TOP_MID, 0, 259);
     lv_obj_set_style_bg_opa(standbyProfileRow, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(standbyProfileRow, 0, 0);
     lv_obj_set_style_pad_all(standbyProfileRow, 0, 0);
@@ -626,7 +652,7 @@ void ConceptUI::init() {
     standbyTargetIcon = lv_img_create(standbyProfileRow);
     lv_img_set_src(standbyTargetIcon, &concept_target);
     lv_obj_set_style_img_opa(standbyTargetIcon, 46, 0);
-    standbyProfile = makeLabel(standbyProfileRow, &dm_sans_11, lv_color_hex(0x393939));
+    standbyProfile = makeLabel(standbyProfileRow, &dm_sans_16_light, lv_color_hex(0x393939));
     lv_label_set_text(standbyProfile, "ESPRESSO");
     lv_obj_t *standbyProfileDot = lv_obj_create(standbyProfileRow);
     lv_obj_set_size(standbyProfileDot, 2, 2);
@@ -634,7 +660,7 @@ void ConceptUI::init() {
     lv_obj_set_style_border_width(standbyProfileDot, 0, 0);
     lv_obj_set_style_bg_color(standbyProfileDot, lv_color_hex(0x393939), 0);
     lv_obj_set_style_pad_all(standbyProfileDot, 0, 0);
-    standbyProfileTemp = makeLabel(standbyProfileRow, &dm_sans_11, lv_color_hex(0x393939));
+    standbyProfileTemp = makeLabel(standbyProfileRow, &dm_sans_16_light, lv_color_hex(0x393939));
     lv_label_set_text(standbyProfileTemp, "93°C");
 
     standbyFace = lv_obj_create(root);
@@ -684,7 +710,7 @@ void ConceptUI::init() {
     }
     standbyHint = lv_img_create(root);
     lv_img_set_src(standbyHint, &concept_standby_hint);
-    lv_obj_align(standbyHint, LV_ALIGN_BOTTOM_MID, 0, -62);
+    lv_obj_align(standbyHint, LV_ALIGN_TOP_MID, 0, 374);
 
     standbyEnteredAt = lv_tick_get();
     buildMenu();
@@ -740,16 +766,15 @@ void ConceptUI::setEditing(bool enabled) {
     editing = enabled && view == View::Brew;
     if (editing) lv_obj_clear_flag(editPanel, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(editPanel, LV_OBJ_FLAG_HIDDEN);
-    for (auto *obj : {stateRow, contextIcon, mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
+    lv_img_set_zoom(contextIcon, editing ? 320 : 256);
+    for (auto *obj : {mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
         if (editing) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         else if (view != View::Standby && view != View::Menu && view != View::Status) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
     }
     for (auto *dot : profileDots) {
-        if (editing) lv_obj_add_flag(dot, LV_OBJ_FLAG_HIDDEN);
-        else if (view == View::Brew) lv_obj_clear_flag(dot, LV_OBJ_FLAG_HIDDEN);
+        if (view == View::Brew) lv_obj_clear_flag(dot, LV_OBJ_FLAG_HIDDEN);
     }
-    if (editing) lv_obj_add_flag(swipeUpHint, LV_OBJ_FLAG_HIDDEN);
-    else if (view == View::Brew) lv_obj_clear_flag(swipeUpHint, LV_OBJ_FLAG_HIDDEN);
+    if (view == View::Brew) lv_obj_clear_flag(swipeUpHint, LV_OBJ_FLAG_HIDDEN);
 }
 
 void ConceptUI::buildRing() {
@@ -996,7 +1021,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         setLabelTextIfChanged(standbyProfile, safeText(state.profile, "ESPRESSO"));
         setLabelTextFmtIfChanged(standbyProfileTemp, "%.0f°C", state.targetTemperature);
         setLabelTextIfChanged(brand, "GAGGI");
-        lv_obj_set_style_text_font(brand, &dm_sans_30_bold, 0);
+        lv_obj_set_style_text_font(brand, &dm_sans_36_bold, 0);
         lv_obj_set_style_text_color(brand, WHITE, 0);
         setLabelTextIfChanged(standbyError, state.error ? safeText(state.errorLabel, "SYSTEM ERROR") : "");
         if (state.error) lv_obj_clear_flag(standbyError, LV_OBJ_FLAG_HIDDEN);
@@ -1020,7 +1045,8 @@ void ConceptUI::update(const ConceptUIState &inputState) {
     lv_obj_set_style_img_opa(profileRight, visualProfileIndex < 4 ? 46 : LV_OPA_TRANSP, 0);
     lv_obj_set_style_img_opa(wifiIcon, state.wifi ? 97 : 25, 0);
     lv_obj_set_style_img_opa(bluetoothIcon, state.connected ? 97 : 25, 0);
-    setLabelTextFmtIfChanged(editTempValue, "%.1f C", state.targetTemperature);
+    setLabelTextFmtIfChanged(editTempValue, "%.0f°C", state.targetTemperature);
+    setLabelTextIfChanged(editTargetName, state.volumetric ? "WEIGHT" : "TIME");
     setLabelTextIfChanged(editTargetValue, safeText(state.brewTarget, state.volumetric ? "0 g" : "0:00"));
 
     char main[32];
@@ -1030,6 +1056,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_obj_add_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
         char phaseUpper[32];
         uppercaseCopy(phaseUpper, sizeof(phaseUpper), safeText(state.phase, "BREW"));
+        lv_obj_set_style_text_font(phaseLabel, &dm_sans_16_medium, 0);
         setLabelTextIfChanged(phaseLabel, state.processComplete ? "COMPLETE" : phaseUpper);
         const uint32_t statusAccent = state.processComplete ? 0x28c870 :
             (std::strstr(phaseUpper, "INFUS") != nullptr ? 0xd07020 : 0xd82828);
@@ -1040,11 +1067,11 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_obj_set_style_img_recolor_opa(statusPressureIcon, LV_OPA_COVER, 0);
         const int elapsedWhole = static_cast<int>(state.elapsedSeconds);
         const int elapsedTenth = static_cast<int>(state.elapsedSeconds * 10.0f) % 10;
-        lv_obj_set_style_text_font(mainValue, &dm_sans_88_bold, 0);
+        setTextFontIfChanged(mainValue, &dm_sans_88_bold);
         mainGeometryChanged |= setLabelTextFmtIfChanged(mainValue, "%d", elapsedWhole);
-        mainGeometryChanged |= setLabelTextFmtIfChanged(mainDecimal, ".%d", elapsedTenth);
+        setLabelTextFmtIfChanged(mainDecimal, ".%d", elapsedTenth);
         mainGeometryChanged |= setLabelTextIfChanged(mainUnit, "s");
-        lv_obj_set_style_text_color(mainValue, state.elapsedPercentage > 0.0f ? WHITE : lv_color_hex(0x282828), 0);
+        setTextColorIfChanged(mainValue, state.elapsedPercentage > 0.0f ? WHITE : lv_color_hex(0x282828));
         snprintf(secondary, sizeof(secondary), "%.1f g  -  %.1f bar", state.weight, state.pressure);
         setLabelTextIfChanged(secondaryValue, secondary);
         setLabelTextFmtIfChanged(statusWeight, "%.1f", state.weight);
@@ -1054,7 +1081,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_chart_set_series_color(chart, pressureSeries, lv_color_hex(statusAccent));
         lv_obj_set_style_line_color(chart, lv_color_hex(statusAccent), LV_PART_MAIN);
         lv_obj_set_style_bg_color(chartEndpoint, lv_color_hex(statusAccent), 0);
-        const float endpointPressure = LV_CLAMP(0.0f, state.pressure, 10.0f);
+        const float endpointPressure = state.processComplete ? 0.0f : LV_CLAMP(0.0f, state.pressure, 10.0f);
         const int endpointY = 286 + static_cast<int>((10.0f - endpointPressure) * 8.0f);
         lv_obj_set_pos(chartEndpoint, 312, endpointY - 2);
         const uint32_t now = lv_tick_get();
@@ -1115,7 +1142,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_obj_add_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
         setImageSourceIfChanged(contextIcon, &concept_grind);
         lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(0xc89020), 0);
-        lv_obj_set_style_text_font(mainValue, &dm_sans_88_bold, 0);
+        setTextFontIfChanged(mainValue, &dm_sans_88_bold);
         const bool grindActive = controller->isGrindActive();
         const int grindTargetSeconds = controller->getTargetGrindDuration() / 1000;
         snprintf(main, sizeof(main), "%d", grindTargetSeconds);
@@ -1129,21 +1156,23 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         else lv_obj_add_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_img_recolor(stateSpinner, lv_color_hex(0xc89020), 0);
     } else {
-        lv_obj_clear_flag(mainDecimal, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
+        if (!editing) {
+            lv_obj_clear_flag(mainDecimal, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
+        }
         const uint32_t accent = view == View::Brew ? (state.temperatureStable ? 0x2ab8d8 : 0x4a8cf0) : 0x4a8cf0;
         if (view == View::Brew) setImageSourceIfChanged(contextIcon, state.temperatureStable ? &concept_drop : &concept_heat);
         else if (view == View::Steam) setImageSourceIfChanged(contextIcon, &concept_steam);
         else setImageSourceIfChanged(contextIcon, &concept_water);
         lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(accent), 0);
         const float shownTemperature = state.temperature > 0.0f ? state.temperature : 22.0f;
-        lv_obj_set_style_text_font(mainValue, &dm_sans_88_bold, 0);
+        setTextFontIfChanged(mainValue, &dm_sans_88_bold);
         snprintf(main, sizeof(main), "%.0f", std::floor(shownTemperature));
         snprintf(secondary, sizeof(secondary), "%.0f°C", state.targetTemperature);
         mainGeometryChanged |= setLabelTextIfChanged(mainValue, main);
-        mainGeometryChanged |= setLabelTextFmtIfChanged(mainDecimal, ".%d", static_cast<int>(std::round(shownTemperature * 10.0f)) % 10);
+        setLabelTextFmtIfChanged(mainDecimal, ".%d", static_cast<int>(std::round(shownTemperature * 10.0f)) % 10);
         mainGeometryChanged |= setLabelTextIfChanged(mainUnit, "°C");
-        lv_obj_set_style_text_color(mainValue, WHITE, 0);
+        setTextColorIfChanged(mainValue, WHITE);
         setLabelTextIfChanged(secondaryValue, secondary);
         lv_obj_set_style_img_recolor(targetIcon, lv_color_hex(accent), 0);
         // The overview is a temperature target screen. Sensor offset/noise can
@@ -1337,6 +1366,10 @@ void ConceptUI::renderCompleteChart() {
             points[i] = static_cast<lv_coord_t>(pressureHistory[left] * (1.0f - mix) + pressureHistory[right] * mix);
         }
     }
+    // The controller samples remain untouched between the endpoints. A closed
+    // shot begins and ends at the machine's idle pressure of 0 bar.
+    points[0] = 0;
+    points[59] = 0;
     // Live sampling advances LVGL's circular series origin. The completed
     // history above is chronological, so point 0 must be drawn at the left.
     lv_chart_set_x_start_point(chart, pressureSeries, 0);
@@ -1580,7 +1613,7 @@ void ConceptUI::eventCallback(lv_event_t *event) {
         self->owner->changeScreen(SCREEN_ID_BREW_SCREEN);
     } else if (target == self->primaryButton) {
         self->handlePrimary();
-    } else if (target == self->mainValue && self->view == View::Brew) {
+    } else if (target == self->secondaryValue && self->view == View::Brew) {
         self->setEditing(true);
     } else if (target == self->editButtons[0]) {
         self->owner->markProfileDirty();
