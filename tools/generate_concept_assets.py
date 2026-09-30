@@ -203,6 +203,20 @@ def drop_icon():
     return im
 
 
+def status_drop_icon():
+    # Exact outline from Figma node 34:551, 8.30212 x 11.9532 px.
+    im = canvas((8, 12)); d = ImageDraw.Draw(im)
+    path = [(4.15106, .5)]
+    path += cubic((4.15106,.5),(4.15106,.5),(.5,4.98085),(.5,7.47021))[1:]
+    path += cubic((.5,7.47021),(.5,8.52656),(.884664,9.53965),(1.56937,10.2866))[1:]
+    path += cubic((1.56937,10.2866),(2.25408,11.0336),(3.18274,11.4532),(4.15106,11.4532))[1:]
+    path += cubic((4.15106,11.4532),(5.11938,11.4532),(6.04805,11.0336),(6.73275,10.2866))[1:]
+    path += cubic((6.73275,10.2866),(7.41746,9.53965),(7.80212,8.52656),(7.80212,7.47021))[1:]
+    path += cubic((7.80212,7.47021),(7.80212,4.98085),(4.15106,.5),(4.15106,.5))[1:]
+    stroke(d, path, (42, 184, 216, 255), 1)
+    return im
+
+
 def steam_icon():
     im = canvas((22,24)); d = ImageDraw.Draw(im)
     stroke(d, cubic((4,20),(5,16),(8,15),(8,11)), width=1.4)
@@ -403,6 +417,7 @@ def main():
         "down_hint": down_hint(),
         "heat": heat_icon(),
         "drop": drop_icon(),
+        "status_drop": status_drop_icon(),
         "steam": steam_icon(),
         "water": water_icon(),
         "grind": grind_icon(),

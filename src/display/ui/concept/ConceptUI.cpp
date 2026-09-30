@@ -389,9 +389,53 @@ void ConceptUI::init() {
     bluetoothIcon = lv_img_create(connectionIcons);
     lv_img_set_src(bluetoothIcon, &concept_bluetooth);
 
+    // Compact Figma status cluster (34:542): two 2 px side arcs, mode in the
+    // middle, battery percentage above and three connectivity dots below.
+    statusCluster = lv_obj_create(root);
+    lv_obj_set_size(statusCluster, 44, 45);
+    lv_obj_align(statusCluster, LV_ALIGN_TOP_MID, 3, 44);
+    lv_obj_set_style_bg_opa(statusCluster, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(statusCluster, 0, 0);
+    lv_obj_set_style_pad_all(statusCluster, 0, 0);
+    lv_obj_clear_flag(statusCluster, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    auto makeStatusArc = [&](uint16_t begin, uint16_t end, uint32_t color) {
+        lv_obj_t *arc = lv_arc_create(statusCluster);
+        lv_obj_set_size(arc, 36, 36);
+        lv_obj_set_pos(arc, 4, 7);
+        lv_arc_set_bg_angles(arc, begin, end);
+        lv_arc_set_angles(arc, begin, begin);
+        lv_obj_set_style_arc_width(arc, 2, LV_PART_MAIN);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(0x1f1f1f), LV_PART_MAIN);
+        lv_obj_set_style_arc_rounded(arc, true, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(arc, 2, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(arc, lv_color_hex(color), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
+        lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB);
+        lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+        return arc;
+    };
+    waterArc = makeStatusArc(130, 230, 0x949494);
+    batteryArc = makeStatusArc(310, 50, 0x45a8d8);
+    batteryPercent = makeLabel(statusCluster, &dm_sans_9, lv_color_hex(0x45a8d8));
+    lv_obj_align(batteryPercent, LV_ALIGN_TOP_MID, 3, 3);
+    for (int i = 0; i < 3; ++i) {
+        connectivityDots[i] = lv_obj_create(statusCluster);
+        lv_obj_set_size(connectivityDots[i], 2, 2);
+        lv_obj_set_pos(connectivityDots[i], 16 + 5 * i, 41);
+        lv_obj_set_style_radius(connectivityDots[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_opa(connectivityDots[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(connectivityDots[i], 0, 0);
+        lv_obj_set_style_pad_all(connectivityDots[i], 0, 0);
+        lv_obj_clear_flag(connectivityDots[i], LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    }
+    warningIcon = makeLabel(statusCluster, &dm_sans_14, lv_color_hex(0xe3a65d));
+    lv_label_set_text(warningIcon, "!");
+    lv_obj_align(warningIcon, LV_ALIGN_TOP_MID, 0, 17);
+    lv_obj_add_flag(warningIcon, LV_OBJ_FLAG_HIDDEN);
+
     profileRow = lv_obj_create(root);
     lv_obj_set_size(profileRow, 240, 18);
-    lv_obj_align(profileRow, LV_ALIGN_TOP_MID, 0, 54);
+    lv_obj_align(profileRow, LV_ALIGN_TOP_MID, 0, 108);
     lv_obj_set_style_bg_opa(profileRow, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(profileRow, 0, 0);
     lv_obj_set_style_pad_all(profileRow, 0, 0);
@@ -414,7 +458,7 @@ void ConceptUI::init() {
 
     stateRow = lv_obj_create(root);
     lv_obj_set_size(stateRow, 190, 22);
-    lv_obj_align(stateRow, LV_ALIGN_TOP_MID, 0, 80);
+    lv_obj_align(stateRow, LV_ALIGN_TOP_MID, 0, 134);
     lv_obj_set_style_bg_opa(stateRow, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(stateRow, 0, 0);
     lv_obj_set_style_pad_all(stateRow, 0, 0);
@@ -437,11 +481,12 @@ void ConceptUI::init() {
     stateLabel = makeLabel(stateRow, &dm_sans_12, lv_color_hex(0x4a8cf0));
     lv_obj_set_style_text_letter_space(stateLabel, 1, 0);
 
-    contextIcon = lv_img_create(root);
+    contextIcon = lv_img_create(statusCluster);
     lv_img_set_src(contextIcon, &concept_heat);
+    lv_img_set_zoom(contextIcon, 112);
     lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(0x4a8cf0), 0);
     lv_obj_set_style_img_recolor_opa(contextIcon, LV_OPA_COVER, 0);
-    lv_obj_align(contextIcon, LV_ALIGN_TOP_MID, 0, 120);
+    lv_obj_align(contextIcon, LV_ALIGN_TOP_MID, 0, 19);
 
     statusTimerIcon = lv_img_create(root);
     lv_img_set_src(statusTimerIcon, &concept_timer);
@@ -819,7 +864,6 @@ void ConceptUI::setEditing(bool enabled) {
     editing = enabled && view == View::Brew;
     if (editing) lv_obj_clear_flag(editPanel, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(editPanel, LV_OBJ_FLAG_HIDDEN);
-    lv_img_set_zoom(contextIcon, editing ? 320 : 256);
     for (auto *obj : {mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
         if (editing) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         else if (view != View::Standby && view != View::Menu && view != View::Status) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
@@ -959,7 +1003,7 @@ void ConceptUI::applyView() {
     else lv_obj_add_flag(standbyButton, LV_OBJ_FLAG_HIDDEN);
     if (menu) lv_obj_clear_flag(menuDownHint, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(menuDownHint, LV_OBJ_FLAG_HIDDEN);
-    for (auto *obj : {profileRow, stateRow, contextIcon, mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
+    for (auto *obj : {statusCluster, profileRow, stateRow, contextIcon, mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
         if (standby || menu) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
     }
@@ -980,6 +1024,7 @@ void ConceptUI::applyView() {
         lv_obj_add_flag(profileRow, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(stateRow, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(statusCluster, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(chart, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(chartEndpoint, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(contextIcon, LV_OBJ_FLAG_HIDDEN);
@@ -1091,6 +1136,45 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         return;
     }
 
+    if (view != View::Status) {
+        const int water = LV_CLAMP(0, state.waterLevel, 100);
+        const int battery = LV_CLAMP(0, state.scaleBattery, 100);
+        const int waterAngle = state.waterLevelAvailable ? water : 0;
+        const int batteryAngle = state.scaleBatteryAvailable ? battery : 0;
+        if (waterAngle != renderedWaterArc) {
+            lv_arc_set_angles(waterArc, 130, 130 + waterAngle);
+            renderedWaterArc = waterAngle;
+        }
+        if (batteryAngle != renderedBatteryArc) {
+            lv_arc_set_angles(batteryArc, 310, (310 + batteryAngle) % 360);
+            renderedBatteryArc = batteryAngle;
+        }
+        if (state.scaleBatteryAvailable) {
+            setLabelTextFmtIfChanged(batteryPercent, "%d", battery);
+            lv_obj_clear_flag(batteryPercent, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(batteryPercent, LV_OBJ_FLAG_HIDDEN);
+        }
+        const uint8_t links = (state.wifi ? 1 : 0) | (state.connected ? 2 : 0) | (state.scaleConnected ? 4 : 0);
+        if (links != renderedConnectivity) {
+            for (int i = 0; i < 3; ++i)
+                lv_obj_set_style_bg_color(connectivityDots[i], lv_color_hex(links & (1 << i) ? 0x45a8d8 : 0x303030), 0);
+            renderedConnectivity = links;
+        }
+        if (state.warningActive || state.error) {
+            lv_obj_add_flag(contextIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(warningIcon, LV_OBJ_FLAG_HIDDEN);
+            const int warningColor = state.warningError || state.error ? 0xd82828 : 0xe3a65d;
+            if (warningColor != renderedWarningColor) {
+                lv_obj_set_style_text_color(warningIcon, lv_color_hex(warningColor), 0);
+                renderedWarningColor = warningColor;
+            }
+        } else {
+            lv_obj_clear_flag(contextIcon, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(warningIcon, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
     const char *mode = "BREW";
     if (view == View::Steam) mode = "STEAM";
     else if (view == View::Water) mode = "FLUSH";
@@ -1199,6 +1283,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
     } else if (view == View::Grind) {
         lv_obj_add_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
         setImageSourceIfChanged(contextIcon, &concept_grind);
+        if (lv_img_get_zoom(contextIcon) != 112) lv_img_set_zoom(contextIcon, 112);
         lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(0xc89020), 0);
         setTextFontIfChanged(mainValue, &dm_sans_88_bold);
         const bool grindActive = controller->isGrindActive();
@@ -1219,9 +1304,11 @@ void ConceptUI::update(const ConceptUIState &inputState) {
             lv_obj_clear_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
         }
         const uint32_t accent = view == View::Brew ? (state.temperatureStable ? 0x2ab8d8 : 0x4a8cf0) : 0x4a8cf0;
-        if (view == View::Brew) setImageSourceIfChanged(contextIcon, state.temperatureStable ? &concept_drop : &concept_heat);
+        if (view == View::Brew) setImageSourceIfChanged(contextIcon, state.temperatureStable ? &concept_status_drop : &concept_heat);
         else if (view == View::Steam) setImageSourceIfChanged(contextIcon, &concept_steam);
         else setImageSourceIfChanged(contextIcon, &concept_water);
+        const uint16_t iconZoom = view == View::Brew && state.temperatureStable ? 256 : 112;
+        if (lv_img_get_zoom(contextIcon) != iconZoom) lv_img_set_zoom(contextIcon, iconZoom);
         lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(accent), 0);
         const float shownTemperature = state.temperature > 0.0f ? state.temperature : 22.0f;
         setTextFontIfChanged(mainValue, &dm_sans_88_bold);
@@ -1246,8 +1333,8 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         if (view == View::Brew) {
             setLabelTextIfChanged(stateLabel, state.temperatureStable ? "READY" : "HEATING");
             lv_obj_set_style_text_color(stateLabel, lv_color_hex(state.temperatureStable ? 0x2ab8d8 : 0x4a8cf0), 0);
-            if (state.temperatureStable) lv_obj_add_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
-            else lv_obj_clear_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
+            // Heat is shown in the status cluster, not beside the state text.
+            lv_obj_add_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
             lv_obj_set_style_img_recolor(stateSpinner, lv_color_hex(0x4a8cf0), 0);
         } else {
             setLabelTextIfChanged(stateLabel, "");
@@ -1263,7 +1350,6 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         if (view == View::Status) {
             lv_obj_align(primaryButton, LV_ALIGN_TOP_MID, 0, 395);
         } else {
-            lv_obj_align(contextIcon, LV_ALIGN_TOP_MID, 0, 120);
             lv_obj_align(targetRow, LV_ALIGN_TOP_MID, 0, 300);
             lv_obj_align(grindTargetRow, LV_ALIGN_TOP_MID, 0, 296);
             lv_obj_align(primaryButton, LV_ALIGN_TOP_MID, 0, 344);

@@ -57,6 +57,7 @@ LV_IMG_DECLARE(concept_up_hint);
 LV_IMG_DECLARE(concept_down_hint);
 LV_IMG_DECLARE(concept_heat);
 LV_IMG_DECLARE(concept_drop);
+LV_IMG_DECLARE(concept_status_drop);
 LV_IMG_DECLARE(concept_steam);
 LV_IMG_DECLARE(concept_water);
 LV_IMG_DECLARE(concept_grind);
@@ -91,6 +92,13 @@ struct ConceptUIState {
     bool volumetricAvailable = false;
     bool preview = false;
     bool brewConfirmVisible = false;
+    bool waterLevelAvailable = false;
+    int waterLevel = 0;
+    bool scaleConnected = false;
+    bool scaleBatteryAvailable = false;
+    int scaleBattery = 0;
+    bool warningActive = false;
+    bool warningError = false;
 };
 
 class ConceptUI {
@@ -134,6 +142,16 @@ class ConceptUI {
     lv_obj_t *connectionIcons = nullptr;
     lv_obj_t *wifiIcon = nullptr;
     lv_obj_t *bluetoothIcon = nullptr;
+    lv_obj_t *statusCluster = nullptr;
+    lv_obj_t *waterArc = nullptr;
+    lv_obj_t *batteryArc = nullptr;
+    lv_obj_t *batteryPercent = nullptr;
+    lv_obj_t *connectivityDots[3] = {nullptr};
+    lv_obj_t *warningIcon = nullptr;
+    int renderedWaterArc = -1;
+    int renderedBatteryArc = -1;
+    uint8_t renderedConnectivity = 0xff;
+    int renderedWarningColor = -1;
     lv_obj_t *profileRow = nullptr;
     lv_obj_t *profileLeft = nullptr;
     lv_obj_t *profileRight = nullptr;

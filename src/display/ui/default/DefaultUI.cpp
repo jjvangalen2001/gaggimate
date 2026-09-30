@@ -2,6 +2,7 @@
 
 #include <WiFi.h>
 #include <display/core/Controller.h>
+#include <display/core/WarningManager.h>
 #include <display/core/process/BrewProcess.h>
 #include <display/core/process/Process.h>
 #include <display/core/zones.h>
@@ -12,6 +13,7 @@
 #include <display/drivers/common/LV_Helper.h>
 #endif
 #include <display/main.h>
+#include <display/plugins/BLEScalePlugin.h>
 #include <display/ui/utils/effects.h>
 #include <display/ui/concept/ConceptUI.h>
 #include <utility>
@@ -306,7 +308,20 @@ void DefaultUI::loop() {
             conceptState.wifi = systemStatus.wifi();
             conceptState.error = systemStatus.error();
             conceptState.processComplete = brewProcess.is_complete();
-            const String warningLabels = controller->getWarnings().getLabels();
+            conceptState.waterLevelAvailable = controller->getSystemInfo().capabilities.tof;
+            if (conceptState.waterLevelAvailable) conceptState.waterLevel = controller->getWaterLevel();
+            conceptState.scaleConnected = BLEScales.isConnected();
+            conceptState.scaleBatteryAvailable = conceptState.scaleConnected && BLEScales.hasBatteryLevel();
+            if (conceptState.scaleBatteryAvailable) conceptState.scaleBattery = BLEScales.getBatteryLevel();
+            const WarningManager &warnings = controller->getWarnings();
+            // Ordinary warm-up has its own icon; other warnings replace the mode icon.
+            for (int i = 0; i < WARNING_TYPE_COUNT; ++i) {
+                const WarningType type = static_cast<WarningType>(i);
+                if (type == WARNING_TEMPERATURE && !conceptState.temperatureStable && !warnings.isError(type)) continue;
+                if (warnings.isWarn(type) || warnings.isError(type)) conceptState.warningActive = true;
+                if (warnings.isError(type)) conceptState.warningError = true;
+            }
+            const String warningLabels = warnings.getLabels();
             conceptState.warningLabels = warningLabels.c_str();
             conceptState.brewConfirmVisible = brewConfirmVisible;
             conceptUI->update(conceptState);
