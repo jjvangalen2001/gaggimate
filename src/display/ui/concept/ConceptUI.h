@@ -81,6 +81,7 @@ struct ConceptUIState {
     const char *profile = "";
     const char *brewTarget = "";
     const char *errorLabel = "";
+    const char *warningLabels = "";
     bool temperatureStable = false;
     bool connected = false;
     bool wifi = false;
@@ -89,6 +90,7 @@ struct ConceptUIState {
     bool volumetric = false;
     bool volumetricAvailable = false;
     bool preview = false;
+    bool brewConfirmVisible = false;
 };
 
 class ConceptUI {
@@ -171,6 +173,10 @@ class ConceptUI {
     lv_obj_t *editTargetName = nullptr;
     lv_obj_t *editTargetValue = nullptr;
     lv_obj_t *editDoneButton = nullptr;
+    lv_obj_t *brewConfirmOverlay = nullptr;
+    lv_obj_t *brewConfirmLabels = nullptr;
+    lv_obj_t *brewConfirmCancel = nullptr;
+    lv_obj_t *brewConfirmStart = nullptr;
     lv_obj_t *grindTargetRow = nullptr;
     lv_obj_t *grindMinus = nullptr;
     lv_obj_t *grindTargetTimer = nullptr;

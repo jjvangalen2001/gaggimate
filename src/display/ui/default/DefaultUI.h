@@ -18,7 +18,6 @@ constexpr int RERENDER_INTERVAL_IDLE = 2500;
 constexpr int RERENDER_INTERVAL_ACTIVE = 100;
 
 constexpr int TEMP_HISTORY_INTERVAL = 250;
-constexpr int TEMP_HISTORY_LENGTH = 20 * 1000 / TEMP_HISTORY_INTERVAL;
 
 int16_t calculate_angle(int set_temp, int range, int offset);
 
@@ -48,6 +47,14 @@ class DefaultUI {
     };
 
     void onVolumetricDelete();
+    // Flush started from the touch start button; loop() releases it once the pointer lifts (GM-201).
+    void onTouchFlushStart() { touchFlushHeld = true; }
+
+    // Brew confirmation overlay, shown when the controller asks to confirm a brew start.
+    void setBrewConfirmVisible(bool visible) {
+        brewConfirmVisible = visible;
+        rerender = true;
+    }
 
 #ifdef GAGGIMATE_SIM
     void previewConceptStatus(float elapsedSeconds, float weight, float pressure, const char *phase, bool complete);
@@ -80,6 +87,7 @@ class DefaultUI {
 
     void updateState();
     void updateSystemStatus();
+    void updateWarnings();
     void updateProfileInfo();
     void updateBoiler();
     void updateBrewProcess();
@@ -89,15 +97,8 @@ class DefaultUI {
     void adjustDials(lv_obj_t *dials);
     void adjustTarget(lv_obj_t *obj, double percentage, double start, double range) const;
 
-    int tempHistory[TEMP_HISTORY_LENGTH] = {0};
-    int tempHistoryIndex = 0;
-    int prevTargetTemp = 0;
-    bool isTempHistoryInitialized = false;
-    int isTemperatureStable = false;
     unsigned long lastTempLog = 0;
-
-    void updateTempHistory();
-    void updateTempStableFlag();
+    int heatingFlashTick = 0;
     void reloadProfiles();
 
     Driver *panelDriver = nullptr;
@@ -118,6 +119,7 @@ class DefaultUI {
     int christmasMode = false;
 
     bool rerender = false;
+    bool touchFlushHeld = false;
     unsigned long lastRender = 0;
 
     int mode = MODE_STANDBY;
@@ -137,6 +139,8 @@ class DefaultUI {
     BoilerValue boiler;
     UIFlagsValue uiFlags;
     BrewProcessValue brewProcess;
+    WarningsValue warnings;
+    bool brewConfirmVisible = false;
     Value currentWeight = FloatValue(0.0);
     Value steamReady = BooleanValue(false);
     Value grindWeightTarget = FloatValue(18.0);

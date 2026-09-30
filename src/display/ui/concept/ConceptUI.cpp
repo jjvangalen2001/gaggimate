@@ -760,6 +760,59 @@ void ConceptUI::init() {
     applyView();
     updateStandbyFace();
     enableGestureBubble(root);
+
+    // Upstream requires an explicit confirmation for error-level warnings.
+    // Keep it above the concept UI so the hidden EEZ screen cannot swallow it.
+    brewConfirmOverlay = lv_obj_create(root);
+    lv_obj_set_size(brewConfirmOverlay, SCREEN_SIZE, SCREEN_SIZE);
+    lv_obj_center(brewConfirmOverlay);
+    lv_obj_set_style_bg_color(brewConfirmOverlay, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(brewConfirmOverlay, LV_OPA_90, 0);
+    lv_obj_set_style_border_width(brewConfirmOverlay, 0, 0);
+    lv_obj_clear_flag(brewConfirmOverlay, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *panel = lv_obj_create(brewConfirmOverlay);
+    lv_obj_set_size(panel, 300, 248);
+    lv_obj_center(panel);
+    lv_obj_set_style_bg_color(panel, lv_color_hex(0x080808), 0);
+    lv_obj_set_style_bg_opa(panel, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(panel, lv_color_hex(0x805020), 0);
+    lv_obj_set_style_border_width(panel, 1, 0);
+    lv_obj_set_style_radius(panel, 28, 0);
+    lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *title = makeLabel(panel, &dm_sans_16_medium, lv_color_hex(0xe3a65d));
+    lv_label_set_text(title, "CHECK BEFORE BREW");
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 26);
+    brewConfirmLabels = makeLabel(panel, &dm_sans_12, WHITE);
+    lv_obj_set_width(brewConfirmLabels, 260);
+    lv_label_set_long_mode(brewConfirmLabels, LV_LABEL_LONG_WRAP);
+    lv_obj_align(brewConfirmLabels, LV_ALIGN_TOP_MID, 0, 72);
+
+    brewConfirmCancel = lv_btn_create(panel);
+    lv_obj_set_size(brewConfirmCancel, 112, 42);
+    lv_obj_align(brewConfirmCancel, LV_ALIGN_BOTTOM_LEFT, 24, -22);
+    lv_obj_set_style_bg_color(brewConfirmCancel, lv_color_hex(0x111111), 0);
+    lv_obj_set_style_border_color(brewConfirmCancel, lv_color_hex(0x555555), 0);
+    lv_obj_set_style_border_width(brewConfirmCancel, 1, 0);
+    lv_obj_set_style_radius(brewConfirmCancel, LV_RADIUS_CIRCLE, 0);
+    lv_obj_add_event_cb(brewConfirmCancel, eventCallback, LV_EVENT_CLICKED, this);
+    lv_obj_t *cancelText = makeLabel(brewConfirmCancel, &dm_sans_12_medium, WHITE);
+    lv_label_set_text(cancelText, "CANCEL");
+    lv_obj_center(cancelText);
+
+    brewConfirmStart = lv_btn_create(panel);
+    lv_obj_set_size(brewConfirmStart, 112, 42);
+    lv_obj_align(brewConfirmStart, LV_ALIGN_BOTTOM_RIGHT, -24, -22);
+    lv_obj_set_style_bg_color(brewConfirmStart, lv_color_hex(0x342015), 0);
+    lv_obj_set_style_border_color(brewConfirmStart, lv_color_hex(0xe3a65d), 0);
+    lv_obj_set_style_border_width(brewConfirmStart, 1, 0);
+    lv_obj_set_style_radius(brewConfirmStart, LV_RADIUS_CIRCLE, 0);
+    lv_obj_add_event_cb(brewConfirmStart, eventCallback, LV_EVENT_CLICKED, this);
+    lv_obj_t *startText = makeLabel(brewConfirmStart, &dm_sans_12_medium, WHITE);
+    lv_label_set_text(startText, "BREW");
+    lv_obj_center(startText);
+    lv_obj_add_flag(brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
 }
 
 void ConceptUI::setEditing(bool enabled) {
@@ -832,7 +885,6 @@ void ConceptUI::show(ScreensEnum screenId) {
     editing = false;
     switch (screenId) {
     case SCREEN_ID_STANDBY_SCREEN: view = View::Standby; break;
-    case SCREEN_ID_MENU_SCREEN:
     case SCREEN_ID_MENU_SCREEN_NEW: view = View::Menu; break;
     case SCREEN_ID_BREW_SCREEN:
     case SCREEN_ID_PROFILE_SCREEN:
@@ -985,6 +1037,12 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         }
     }
     lastState = state;
+    if (state.brewConfirmVisible && view == View::Brew) {
+        setLabelTextIfChanged(brewConfirmLabels, safeText(state.warningLabels, "Check machine warnings"));
+        lv_obj_clear_flag(brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
+    }
     const float tempRatio = state.targetTemperature > 0 ? state.temperature / state.targetTemperature : 0.0f;
     // Simple-pump profiles have no controller pressure target even though a
     // pressure sensor still reports live bar values. Use the dial's 10 bar
@@ -1606,6 +1664,17 @@ void ConceptUI::eventCallback(lv_event_t *event) {
     }
     if (code == LV_EVENT_CLICKED && self->suppressNextClick) {
         self->suppressNextClick = false;
+        return;
+    }
+    if (target == self->brewConfirmCancel) {
+        self->owner->setBrewConfirmVisible(false);
+        lv_obj_add_flag(self->brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    if (target == self->brewConfirmStart) {
+        self->owner->setBrewConfirmVisible(false);
+        lv_obj_add_flag(self->brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
+        self->controller->activate(true);
         return;
     }
     if (target == self->root && self->view == View::Standby) {
