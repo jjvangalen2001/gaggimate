@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="GRIND" opacity="0.75">
+<path id="track L" d="M18.7169 70.838C13.3636 67.4276 8.9566 62.7223 5.90356 57.1573C2.85053 51.5924 1.25 45.3474 1.25 39C1.25 32.6526 2.85053 26.4076 5.90356 20.8427C8.9566 15.2777 13.3636 10.5724 18.7169 7.16198" stroke-width="2.5" stroke-linecap="round" stroke="#1F1F1F"/>
+<path id="track R" d="M59.2831 7.16197C64.6364 10.5724 69.0434 15.2777 72.0964 20.8427C75.1495 26.4076 76.75 32.6526 76.75 39C76.75 45.3474 75.1495 51.5924 72.0964 57.1573C69.0434 62.7223 64.6364 67.4276 59.2831 70.838" stroke-width="2.5" stroke-linecap="round" stroke="#1F1F1F"/>
+<path id="value L" d="M18.7169 70.838C13.3636 67.4276 8.9566 62.7223 5.90356 57.1573C2.85052 51.5924 1.25 45.3474 1.25 39" stroke-width="2.5" stroke-linecap="round" stroke="#949494"/>
+<path id="value R" d="M76.75 39C76.75 45.3474 75.1495 51.5924 72.0964 57.1573C69.0434 62.7223 64.6364 67.4276 59.2831 70.838" stroke-width="2.5" stroke-linecap="round" stroke="#949494"/>
+<g id="glyph" opacity="0.8">
+<path id="Vector" d="M45.1436 43.3018C41.7779 48.1086 36.2988 50.0793 32.9057 47.7035C29.5127 45.3277 29.4906 39.505 32.8564 34.6982C36.2221 29.8914 41.7012 27.9207 45.0942 30.2965C48.4873 32.6723 48.5094 38.495 45.1436 43.3018Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="white"/>
+<path id="Vector_2" d="M35.25 45.875C37.125 43.375 37.5 41.125 37 38.875C36.5 36.625 37.75 34.375 42.5 32" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="white"/>
+</g>
+</g>
+</svg>

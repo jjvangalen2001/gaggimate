@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="BREW">
+<path id="track L" d="M18.7169 70.838C13.3636 67.4276 8.95661 62.7223 5.90357 57.1573C2.85053 51.5924 1.25001 45.3474 1.25001 39C1.25001 32.6526 2.85053 26.4076 5.90357 20.8427C8.95661 15.2777 13.3636 10.5724 18.7169 7.16198" stroke-width="2.5" stroke-linecap="round" stroke="#1F1F1F"/>
+<path id="track R" d="M59.2831 7.16197C64.6364 10.5724 69.0434 15.2777 72.0964 20.8427C75.1495 26.4076 76.75 32.6526 76.75 39C76.75 45.3474 75.1495 51.5924 72.0964 57.1573C69.0434 62.7223 64.6364 67.4276 59.2831 70.838" stroke-width="2.5" stroke-linecap="round" stroke="#1F1F1F"/>
+<path id="value L" d="M18.7169 70.838C13.7958 67.7029 9.66847 63.4698 6.65892 58.4709C3.64936 53.4721 1.83956 47.8436 1.3716 42.0275C0.903652 36.2114 1.7903 30.366 3.96191 24.9503C6.13353 19.5346 9.53101 14.696 13.8876 10.8144" stroke-width="2.5" stroke-linecap="round" stroke="#2AB8D8"/>
+<g id="glyph">
+<path id="Vector" d="M30.25 35.25H44V40.875C44 42.6984 43.2757 44.447 41.9864 45.7364C40.6971 47.0257 38.9484 47.75 37.125 47.75C35.3016 47.75 33.553 47.0257 32.2636 45.7364C30.9743 44.447 30.25 42.6984 30.25 40.875V35.25Z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#2AB8D8"/>
+<path id="Vector_2" d="M44 37.75H45.875C46.7038 37.75 47.4987 38.0792 48.0847 38.6653C48.6708 39.2513 49 40.0462 49 40.875C49 41.7038 48.6708 42.4987 48.0847 43.0847C47.4987 43.6708 46.7038 44 45.875 44H44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#2AB8D8"/>
+<path id="Vector_3" d="M35.25 28.375C34.5 29.375 34.5 30.5 35.25 31.5M39 28.375C38.25 29.375 38.25 30.5 39 31.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#2AB8D8"/>
+</g>
+</g>
+</svg>

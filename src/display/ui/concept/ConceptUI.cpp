@@ -10,6 +10,8 @@
 #include <cstdio>
 #include <ctime>
 #include <display/core/Controller.h>
+#include <display/core/process/BrewProcess.h>
+#include <display/plugins/BLEScalePlugin.h>
 #include <display/ui/default/DefaultUI.h>
 #include <display/ui/default/eez/images.h>
 
@@ -51,6 +53,14 @@ void setTextFontIfChanged(lv_obj_t *label, const lv_font_t *font) {
 
 void setTextColorIfChanged(lv_obj_t *label, lv_color_t color) {
     if (lv_obj_get_style_text_color(label, LV_PART_MAIN).full != color.full) lv_obj_set_style_text_color(label, color, 0);
+}
+
+void setImageRecolorIfChanged(lv_obj_t *image, lv_color_t color) {
+    if (lv_obj_get_style_img_recolor(image, LV_PART_MAIN).full != color.full) lv_obj_set_style_img_recolor(image, color, 0);
+}
+
+void setImageOpacityIfChanged(lv_obj_t *image, lv_opa_t opacity) {
+    if (lv_obj_get_style_img_opa(image, LV_PART_MAIN) != opacity) lv_obj_set_style_img_opa(image, opacity, 0);
 }
 
 void uppercaseCopy(char *destination, size_t size, const char *source) {
@@ -492,6 +502,7 @@ void ConceptUI::init() {
     lv_img_set_src(statusTimerIcon, &concept_timer);
     lv_obj_align(statusTimerIcon, LV_ALIGN_TOP_MID, 0, 99);
     lv_obj_set_style_img_opa(statusTimerIcon, 179, 0);
+    lv_obj_set_style_img_recolor_opa(statusTimerIcon, LV_OPA_COVER, 0);
 
     statusMetrics = lv_obj_create(root);
     lv_obj_set_size(statusMetrics, 220, 24);
@@ -514,6 +525,7 @@ void ConceptUI::init() {
     lv_obj_set_style_pad_all(metricDot, 0, 0);
     statusPressureIcon = lv_img_create(statusMetrics);
     lv_img_set_src(statusPressureIcon, &concept_pressure);
+    lv_obj_set_style_img_recolor_opa(statusPressureIcon, LV_OPA_COVER, 0);
     statusPressure = makeLabel(statusMetrics, &dm_mono_15, lv_color_hex(0x292929));
     lv_obj_t *pressureUnit = makeLabel(statusMetrics, &dm_sans_10_units, lv_color_hex(0x383838));
     lv_label_set_text(pressureUnit, "bar");
@@ -632,7 +644,8 @@ void ConceptUI::init() {
         lv_obj_set_style_text_letter_space(name, 1, 0);
         lv_obj_set_size(name, 80, 22);
         lv_obj_set_pos(name, 130, 197 + row * 42);
-        if (row == 1) editTargetName = name;
+        if (row == 0) editTempName = name;
+        else editTargetName = name;
     }
     editTempValue = makeLabel(editPanel, &dm_sans_16_medium, lv_color_hex(0xcccccc));
     editTargetValue = makeLabel(editPanel, &dm_sans_16_medium, lv_color_hex(0xcccccc));
@@ -770,11 +783,11 @@ void ConceptUI::init() {
     lv_obj_set_style_pad_all(standbyButton, 0, 0);
     lv_obj_add_event_cb(standbyButton, eventCallback, LV_EVENT_CLICKED, this);
     lv_obj_t *standbyIcon = lv_img_create(standbyButton);
-    lv_img_set_src(standbyIcon, &concept_power);
-    lv_obj_set_style_img_opa(standbyIcon, 107, 0);
+    lv_img_set_src(standbyIcon, &concept_menu_duo_power);
+    lv_obj_set_style_img_opa(standbyIcon, LV_OPA_COVER, 0);
     lv_obj_center(standbyIcon);
     menuDownHint = lv_img_create(root);
-    lv_img_set_src(menuDownHint, &concept_down_hint);
+    lv_img_set_src(menuDownHint, &concept_menu_duo_down);
     lv_obj_set_style_img_opa(menuDownHint, 38, 0);
     // Figma 5:1111: 14x9 down hint at x=233, y=441.
     lv_obj_align(menuDownHint, LV_ALIGN_TOP_MID, 0, 441);
@@ -858,10 +871,176 @@ void ConceptUI::init() {
     lv_label_set_text(startText, "BREW");
     lv_obj_center(startText);
     lv_obj_add_flag(brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
+    buildQuickSettings();
 }
 
+void ConceptUI::buildQuickSettings() {
+    quickSheet = lv_obj_create(root);
+    lv_obj_set_size(quickSheet, SCREEN_SIZE, SCREEN_SIZE);
+    lv_obj_set_pos(quickSheet, 0, 0);
+    lv_obj_set_style_bg_color(quickSheet, lv_color_hex(0x080808), 0);
+    lv_obj_set_style_bg_opa(quickSheet, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(quickSheet, 0, 0);
+    lv_obj_set_style_pad_all(quickSheet, 0, 0);
+    lv_obj_clear_flag(quickSheet, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_EVENT_BUBBLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_event_cb(quickSheet, eventCallback, LV_EVENT_ALL, this);
+    quickHeading = makeLabel(quickSheet, &dm_mono_12, lv_color_hex(0x8c8c8c));
+    lv_obj_set_size(quickHeading, 260, 20);
+    lv_obj_set_pos(quickHeading, 110, 106);
+    lv_label_set_long_mode(quickHeading, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    const char *labels[] = {"Volumetric", "Tare", "Flush", "Standby"};
+    const lv_img_dsc_t *icons[] = {&concept_quick_volume, &concept_quick_tare, &concept_quick_flush, &concept_quick_standby};
+    for (int i = 0; i < 4; ++i) {
+        auto *button = quickButtons[i] = lv_btn_create(quickSheet);
+        lv_obj_set_size(button, 88, 88);
+        lv_obj_set_pos(button, i == 2 || i == 0 ? 136 : 256, i == 1 || i == 2 ? 160 : 272);
+        // RGB565-representable neutral gray; 0x1f1f1f truncates to greenish (24,28,24).
+        lv_obj_set_style_bg_color(button, lv_color_hex(0x202020), 0);
+        lv_obj_set_style_bg_opa(button, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(button, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_border_width(button, 1, 0);
+        lv_obj_set_style_border_color(button, lv_color_hex(0x2ab8d8), 0);
+        lv_obj_set_style_border_opa(button, 110, 0);
+        lv_obj_set_style_bg_color(button, lv_color_hex(0x303438), LV_STATE_PRESSED);
+        lv_obj_set_style_color_filter_dsc(button, nullptr, LV_STATE_PRESSED);
+        lv_obj_set_style_shadow_width(button, 0, 0);
+        lv_obj_set_style_pad_all(button, 0, 0);
+        lv_obj_clear_flag(button, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_EVENT_BUBBLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+        lv_obj_add_event_cb(button, eventCallback, LV_EVENT_ALL, this);
+        if (i == 2) {
+            quickFlushProgress = lv_arc_create(button);
+            lv_obj_set_size(quickFlushProgress, 86, 86);
+            lv_obj_set_pos(quickFlushProgress, 0, 0);
+            lv_arc_set_rotation(quickFlushProgress, 270);
+            lv_arc_set_bg_angles(quickFlushProgress, 0, 360);
+            lv_arc_set_range(quickFlushProgress, 0, 1000);
+            lv_arc_set_value(quickFlushProgress, 0);
+            lv_obj_remove_style(quickFlushProgress, nullptr, LV_PART_KNOB);
+            lv_obj_set_style_arc_width(quickFlushProgress, 3, LV_PART_MAIN);
+            lv_obj_set_style_arc_opa(quickFlushProgress, LV_OPA_TRANSP, LV_PART_MAIN);
+            lv_obj_set_style_arc_width(quickFlushProgress, 3, LV_PART_INDICATOR);
+            lv_obj_set_style_arc_color(quickFlushProgress, lv_color_hex(0x2ab8d8), LV_PART_INDICATOR);
+            lv_obj_clear_flag(quickFlushProgress, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+        }
+        auto *icon = quickIcons[i] = lv_img_create(button);
+        lv_img_set_src(icon, icons[i]);
+        lv_img_set_zoom(icon, 384);
+        lv_obj_set_pos(icon, (86 - icons[i]->header.w) / 2, 22);
+        auto *label = makeLabel(button, i == 0 ? &dm_sans_12_medium : &dm_sans_14, lv_color_hex(0xd9d9d9));
+        lv_label_set_text(label, labels[i]);
+        lv_obj_set_width(label, 86);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_pos(label, 0, i == 0 ? 52 : 51);
+        quickValues[i] = makeLabel(button, &dm_mono_12, lv_color_hex(0x999999));
+        lv_obj_set_size(quickValues[i], 86, 18);
+        lv_obj_set_style_text_align(quickValues[i], LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_pos(quickValues[i], 0, 64);
+        if (i == 2 || i == 3) lv_obj_add_flag(quickValues[i], LV_OBJ_FLAG_HIDDEN);
+    }
+    quickClose = lv_btn_create(quickSheet);
+    lv_obj_set_size(quickClose, 64, 48);
+    lv_obj_set_pos(quickClose, 208, 415);
+    lv_obj_set_style_bg_opa(quickClose, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(quickClose, 0, 0);
+    lv_obj_set_style_shadow_width(quickClose, 0, 0);
+    lv_obj_set_style_pad_all(quickClose, 0, 0);
+    lv_obj_clear_flag(quickClose, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_EVENT_BUBBLE | LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_event_cb(quickClose, eventCallback, LV_EVENT_ALL, this);
+    auto *handle = lv_obj_create(quickClose);
+    lv_obj_set_size(handle, 12, 4);
+    lv_obj_set_pos(handle, 26, 31);
+    lv_obj_set_style_radius(handle, 2, 0);
+    lv_obj_set_style_border_width(handle, 0, 0);
+    lv_obj_set_style_bg_color(handle, lv_color_hex(0x7a7a7a), 0);
+    lv_obj_clear_flag(handle, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(quickSheet, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ConceptUI::setQuickOpen(bool open) {
+    if (quickOpen == open) return;
+    quickOpen = open;
+    if (!open) {
+        quickFlushTracking = false;
+        quickFlushRunning = false;
+        quickFlushComplete = false;
+    }
+    touchTracking = false;
+    // Reuse the live ring and status artwork rather than duplicate or fake data.
+    for (auto *tick : ticks) lv_obj_set_parent(tick, open ? quickSheet : root);
+    lv_obj_set_parent(statusCluster, open ? quickSheet : root);
+    if (open) {
+        updateQuickSettings();
+        lv_obj_clear_flag(quickSheet, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(quickSheet);
+    } else lv_obj_add_flag(quickSheet, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ConceptUI::updateQuickSettings() {
+    if (quickFlushTracking) {
+        // Read the existing process while locked: it can be deleted by the logic task.
+        std::lock_guard<std::recursive_mutex> guard(controller->getProcessLock());
+        auto *process = controller->getProcess();
+        if (process && process->getType() == MODE_BREW && static_cast<BrewProcess *>(process)->isUtility()) {
+            auto *flush = static_cast<BrewProcess *>(process);
+            quickFlushRunning = flush->isActive();
+            const auto duration = flush->getTotalDuration();
+            const float fraction = duration > 0 ? (millis() - flush->processStarted) / static_cast<float>(duration) : 0.0f;
+            lv_arc_set_value(quickFlushProgress, quickFlushRunning ? static_cast<int>(LV_MIN(fraction, 0.99f) * 1000) : 1000);
+            quickFlushComplete = !quickFlushRunning;
+        } else if (quickFlushRunning) {
+            quickFlushRunning = false;
+            quickFlushComplete = true;
+            lv_arc_set_value(quickFlushProgress, 1000);
+        }
+    } else lv_arc_set_value(quickFlushProgress, 0);
+    const bool busy = controller->isActive() || controller->isGrindActive() || controller->isUpdating() || controller->isAutotuning();
+    const bool canFlush = !busy && lastState.connected && controller->isReady() && !lastState.error && !lastState.warningError;
+    const bool enabled[] = {!busy && lastState.volumetricAvailable, !busy && lastState.scaleConnected, canFlush || quickFlushRunning, !busy};
+    const uint8_t quickStates = (enabled[0] ? 1 : 0) | (enabled[1] ? 2 : 0) | (enabled[2] ? 4 : 0) |
+        (enabled[3] ? 8 : 0) | (enabled[0] && lastState.volumetric ? 16 : 0);
+    if (quickStates != renderedQuickStates) {
+      for (int i = 0; i < 4; ++i) {
+        // Keep unavailable buttons touchable for swipe dismissal, but never run their actions.
+        quickEnabled[i] = enabled[i];
+        // Whole-object opacity blends RGB565 channels unevenly, producing a green tint.
+        // Use opaque, representable neutral grays for the unavailable state instead.
+        lv_obj_set_style_opa(quickButtons[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(quickButtons[i], lv_color_hex(enabled[i] ? 0x202020 : 0x101010), 0);
+        lv_obj_set_style_border_color(quickButtons[i], lv_color_hex(enabled[i] ? 0x2ab8d8 : 0x282828), 0);
+        lv_obj_set_style_border_opa(quickButtons[i], enabled[i] ? 110 : LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(quickButtons[i], lv_color_hex(enabled[i] ? 0x303438 : 0x101010), LV_STATE_PRESSED);
+        lv_obj_set_style_img_recolor(quickIcons[i], lv_color_hex(0x606060), 0);
+        lv_obj_set_style_img_recolor_opa(quickIcons[i], enabled[i] ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
+        for (uint32_t childIndex = 0; childIndex < lv_obj_get_child_cnt(quickButtons[i]); ++childIndex) {
+            auto *child = lv_obj_get_child(quickButtons[i], childIndex);
+            if (lv_obj_check_type(child, &lv_label_class)) {
+                setTextColorIfChanged(child, lv_color_hex(enabled[i] ? (child == quickValues[i] ? 0x999999 : 0xd9d9d9) : 0x686868));
+            }
+        }
+      }
+      if (quickEnabled[0] && lastState.volumetric) lv_obj_set_style_bg_color(quickButtons[0], lv_color_hex(0x124048), 0);
+      renderedQuickStates = quickStates;
+    }
+    setLabelTextIfChanged(quickHeading, lastState.warningActive || lastState.error ? safeText(lastState.warningLabels, safeText(lastState.errorLabel, "CHECK MACHINE")) : "QUICK SETTINGS");
+    setTextColorIfChanged(quickHeading, lv_color_hex(lastState.warningActive || lastState.error ? 0xd22626 : 0x8c8c8c));
+    setLabelTextIfChanged(quickValues[0], lastState.volumetricAvailable ? (lastState.volumetric ? "On" : "Off") : "");
+    if (lastState.scaleConnected) setLabelTextFmtIfChanged(quickValues[1], "%.1f g", lastState.weight);
+    else setLabelTextIfChanged(quickValues[1], "");
+    setLabelTextIfChanged(quickValues[3], "");
+}
+
+
 void ConceptUI::setEditing(bool enabled) {
-    editing = enabled && view == View::Brew;
+    editing = enabled && (view == View::Brew || view == View::Steam);
+    const bool steam = view == View::Steam;
+    for (auto *obj : {editTargetName, editTargetValue, editButtons[2], editButtons[3]}) {
+        if (steam) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_obj_set_y(editTempName, steam ? 218 : 197);
+    lv_obj_set_y(editTempValue, steam ? 218 : 197);
+    lv_obj_set_y(editButtons[0], steam ? 210 : 189);
+    lv_obj_set_y(editButtons[1], steam ? 210 : 189);
     if (editing) lv_obj_clear_flag(editPanel, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(editPanel, LV_OBJ_FLAG_HIDDEN);
     for (auto *obj : {mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
@@ -899,32 +1078,60 @@ void ConceptUI::buildRing() {
 
 void ConceptUI::buildMenu() {
     static const char *labels[] = {"BREW", "STEAM", "WATER", "GRIND"};
-    static const lv_img_dsc_t *icons[] = {&concept_menu_cup, &concept_menu_drops, &concept_menu_water,
-                                          &concept_menu_bean};
-    // Figma node 5:1111: 166 px grid, 64.75 px columns, 36 px gap;
-    // rows are 71.5 px with a 22 px gap and start at y=157.5.
-    static const int x[] = {-50, 50, -50, 50};
-    static const int y[] = {-47, -47, 47, 47};
+    static const lv_img_dsc_t *icons[] = {&concept_menu_duo_brew, &concept_menu_duo_steam,
+                                          &concept_menu_water, &concept_menu_duo_grind};
+    // Figma 5:1111 / 51:2: 78 px duo icons, labels 84 px below their tops.
+    // Keep the existing Water action in the Manual slot (Manual is out of scope).
+    static const int x[] = {149, 149, 253, 253};
+    static const int y[] = {157, 265, 157, 265};
     for (int i = 0; i < 4; i++) {
         menuButtons[i] = lv_btn_create(root);
-        lv_obj_set_size(menuButtons[i], 65, 72);
-        lv_obj_align(menuButtons[i], LV_ALIGN_CENTER, x[i], y[i]);
+        lv_obj_set_size(menuButtons[i], 78, 102);
+        lv_obj_set_pos(menuButtons[i], x[i], y[i]);
         lv_obj_set_style_bg_opa(menuButtons[i], LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(menuButtons[i], 0, 0);
         lv_obj_set_style_shadow_width(menuButtons[i], 0, 0);
         lv_obj_set_style_pad_all(menuButtons[i], 0, 0);
+        lv_obj_clear_flag(menuButtons[i], LV_OBJ_FLAG_SCROLLABLE);
+        enableGestureBubble(menuButtons[i]);
         lv_obj_add_event_cb(menuButtons[i], eventCallback, LV_EVENT_CLICKED, this);
+        if (i == 2) {
+            // Water is not present in the mockup; compose its existing icon
+            // with the same native 78 px duo arc geometry.
+            for (int side = 0; side < 2; ++side) {
+                lv_obj_t *arc = lv_arc_create(menuButtons[i]);
+                lv_obj_set_size(arc, 78, 78);
+                lv_obj_set_pos(arc, 0, 0);
+                lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, 0);
+                lv_obj_set_style_arc_width(arc, 2, LV_PART_MAIN);
+                lv_obj_set_style_arc_color(arc, lv_color_hex(0x202020), LV_PART_MAIN);
+                lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_INDICATOR);
+                lv_obj_remove_style(arc, nullptr, LV_PART_KNOB);
+                lv_arc_set_bg_angles(arc, side ? 310 : 130, side ? 50 : 230);
+                lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+            }
+        }
         lv_obj_t *icon = lv_img_create(menuButtons[i]);
         lv_img_set_src(icon, icons[i]);
-        lv_obj_align(icon, LV_ALIGN_TOP_MID, 0, 8);
-        lv_obj_t *label = makeLabel(menuButtons[i], &dm_sans_9, lv_color_hex(0xa6a6a6));
+        lv_obj_align(icon, LV_ALIGN_TOP_MID, 0, i == 2 ? 21 : 0);
+        lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_t *label = makeLabel(menuButtons[i], &dm_mono_12, lv_color_hex(i == 0 ? 0x2ab8d8 : 0x8c8c8c));
         lv_obj_set_style_text_letter_space(label, 1, 0);
         lv_label_set_text(label, labels[i]);
-        lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 50);
+        lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 84);
     }
 }
 
 void ConceptUI::show(ScreensEnum screenId) {
+    // Only a flush started here stays in quick settings. Warnings/standby still take precedence.
+    if (quickOpen && quickFlushTracking && (screenId == SCREEN_ID_STATUS_SCREEN || screenId == SCREEN_ID_BREW_SCREEN)) {
+        std::lock_guard<std::recursive_mutex> guard(controller->getProcessLock());
+        auto *process = controller->getProcess();
+        if (!process || (process->getType() == MODE_BREW && static_cast<BrewProcess *>(process)->isUtility())) {
+            if (lv_scr_act() != root) lv_scr_load(root);
+            return;
+        }
+    }
     const View previousView = view;
     editing = false;
     switch (screenId) {
@@ -978,6 +1185,7 @@ void ConceptUI::setMode(View next) {
 }
 
 void ConceptUI::applyView() {
+    if (quickSheet) setQuickOpen(false);
     const bool standby = view == View::Standby;
     const bool menu = view == View::Menu;
     const bool status = view == View::Status;
@@ -1004,7 +1212,7 @@ void ConceptUI::applyView() {
     if (menu) lv_obj_clear_flag(menuDownHint, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(menuDownHint, LV_OBJ_FLAG_HIDDEN);
     for (auto *obj : {statusCluster, profileRow, stateRow, contextIcon, mainValue, mainDecimal, mainUnit, targetRow, primaryButton}) {
-        if (standby || menu) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        if (standby || (menu && obj != statusCluster && obj != contextIcon)) lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
     }
     for (auto *dot : profileDots) {
@@ -1038,8 +1246,7 @@ void ConceptUI::applyView() {
         lv_obj_add_flag(statusMetrics, LV_OBJ_FLAG_HIDDEN);
     }
     setEditing(false);
-    if (menu) lv_obj_clear_flag(connection, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(connection, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(connection, LV_OBJ_FLAG_HIDDEN);
     if (standby) lv_obj_clear_flag(connectionIcons, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(connectionIcons, LV_OBJ_FLAG_HIDDEN);
     lv_obj_align(connection, LV_ALIGN_TOP_MID, 0, 44);
@@ -1082,7 +1289,9 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         }
     }
     lastState = state;
+    if (quickOpen) updateQuickSettings();
     if (state.brewConfirmVisible && view == View::Brew) {
+        if (quickOpen) setQuickOpen(false);
         setLabelTextIfChanged(brewConfirmLabels, safeText(state.warningLabels, "Check machine warnings"));
         lv_obj_clear_flag(brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
     } else {
@@ -1112,7 +1321,9 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         const float temperatureRatio = state.targetTemperature > 0.0f ? state.temperature / state.targetTemperature : 0.0f;
         gradientFill = LV_CLAMP(0.12f, temperatureRatio, 1.0f);
     }
-    applyStateGradient(gradient, gradientFill);
+    // The menu/standby have no glow, and quick settings is an opaque overlay.
+    // Generate the identical live gradient only when it can actually be seen.
+    if (view != View::Standby && view != View::Menu && !quickOpen) applyStateGradient(gradient, gradientFill);
     if (view != View::Standby && view != View::Menu) lv_obj_clear_flag(stateBackground, LV_OBJ_FLAG_HIDDEN);
     updateHeatingGradient();
     setLabelTextFmtIfChanged(connection, "%s  %s", state.wifi ? "WiFi" : "--", state.connected ? "BT" : "--");
@@ -1124,18 +1335,13 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         setLabelTextIfChanged(standbyProfile, safeText(state.profile, "ESPRESSO"));
         setLabelTextFmtIfChanged(standbyProfileTemp, "%.0f°C", state.targetTemperature);
         setLabelTextIfChanged(brand, "GAGGI");
-        lv_obj_set_style_text_font(brand, &dm_sans_36_bold, 0);
-        lv_obj_set_style_text_color(brand, WHITE, 0);
+        setTextFontIfChanged(brand, &dm_sans_36_bold);
+        setTextColorIfChanged(brand, WHITE);
         setLabelTextIfChanged(standbyError, state.error ? safeText(state.errorLabel, "SYSTEM ERROR") : "");
         if (state.error) lv_obj_clear_flag(standbyError, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(standbyError, LV_OBJ_FLAG_HIDDEN);
         return;
     }
-    if (view == View::Menu) {
-        setLabelTextFmtIfChanged(connection, "%.0f C     %.1f bar", state.temperature, state.pressure);
-        return;
-    }
-
     if (view != View::Status) {
         const int water = LV_CLAMP(0, state.waterLevel, 100);
         const int battery = LV_CLAMP(0, state.scaleBattery, 100);
@@ -1175,6 +1381,11 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         }
     }
 
+    if (view == View::Menu) {
+        setImageSourceIfChanged(contextIcon, state.temperatureStable ? &concept_status_drop : &concept_heat);
+        return;
+    }
+
     const char *mode = "BREW";
     if (view == View::Steam) mode = "STEAM";
     else if (view == View::Water) mode = "FLUSH";
@@ -1183,10 +1394,10 @@ void ConceptUI::update(const ConceptUIState &inputState) {
     char profileUpper[48];
     uppercaseCopy(profileUpper, sizeof(profileUpper), view == View::Brew ? state.profile : mode);
     setLabelTextIfChanged(modeLabel, profileUpper);
-    lv_obj_set_style_img_opa(profileLeft, visualProfileIndex > 0 ? 46 : LV_OPA_TRANSP, 0);
-    lv_obj_set_style_img_opa(profileRight, visualProfileIndex < 4 ? 46 : LV_OPA_TRANSP, 0);
-    lv_obj_set_style_img_opa(wifiIcon, state.wifi ? 97 : 25, 0);
-    lv_obj_set_style_img_opa(bluetoothIcon, state.connected ? 97 : 25, 0);
+    setImageOpacityIfChanged(profileLeft, visualProfileIndex > 0 ? 46 : LV_OPA_TRANSP);
+    setImageOpacityIfChanged(profileRight, visualProfileIndex < 4 ? 46 : LV_OPA_TRANSP);
+    setImageOpacityIfChanged(wifiIcon, state.wifi ? 97 : 25);
+    setImageOpacityIfChanged(bluetoothIcon, state.connected ? 97 : 25);
     setLabelTextFmtIfChanged(editTempValue, "%.0f°C", state.targetTemperature);
     setLabelTextIfChanged(editTargetName, state.volumetric ? "WEIGHT" : "TIME");
     setLabelTextIfChanged(editTargetValue, safeText(state.brewTarget, state.volumetric ? "0 g" : "0:00"));
@@ -1198,15 +1409,13 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_obj_add_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
         char phaseUpper[32];
         uppercaseCopy(phaseUpper, sizeof(phaseUpper), safeText(state.phase, "BREW"));
-        lv_obj_set_style_text_font(phaseLabel, &dm_sans_16_medium, 0);
+        setTextFontIfChanged(phaseLabel, &dm_sans_16_medium);
         setLabelTextIfChanged(phaseLabel, state.processComplete ? "COMPLETE" : phaseUpper);
         const uint32_t statusAccent = state.processComplete ? 0x28c870 :
             (std::strstr(phaseUpper, "INFUS") != nullptr ? 0xd07020 : 0xd82828);
-        lv_obj_set_style_text_color(phaseLabel, lv_color_hex(statusAccent), 0);
-        lv_obj_set_style_img_recolor(statusTimerIcon, lv_color_hex(statusAccent), 0);
-        lv_obj_set_style_img_recolor_opa(statusTimerIcon, LV_OPA_COVER, 0);
-        lv_obj_set_style_img_recolor(statusPressureIcon, lv_color_hex(statusAccent), 0);
-        lv_obj_set_style_img_recolor_opa(statusPressureIcon, LV_OPA_COVER, 0);
+        setTextColorIfChanged(phaseLabel, lv_color_hex(statusAccent));
+        setImageRecolorIfChanged(statusTimerIcon, lv_color_hex(statusAccent));
+        setImageRecolorIfChanged(statusPressureIcon, lv_color_hex(statusAccent));
         const int elapsedWhole = static_cast<int>(state.elapsedSeconds);
         const int elapsedTenth = static_cast<int>(state.elapsedSeconds * 10.0f) % 10;
         setTextFontIfChanged(mainValue, &dm_sans_88_bold);
@@ -1218,11 +1427,13 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         setLabelTextIfChanged(secondaryValue, secondary);
         setLabelTextFmtIfChanged(statusWeight, "%.1f", state.weight);
         setLabelTextFmtIfChanged(statusPressure, "%.1f", state.pressure);
-        lv_obj_set_style_text_color(statusWeight, lv_color_hex(state.weight > 0 ? 0xadadad : 0x292929), 0);
-        lv_obj_set_style_text_color(statusPressure, lv_color_hex(state.pressure > 0 ? statusAccent : 0x292929), 0);
-        lv_chart_set_series_color(chart, pressureSeries, lv_color_hex(statusAccent));
-        lv_obj_set_style_line_color(chart, lv_color_hex(statusAccent), LV_PART_MAIN);
-        lv_obj_set_style_bg_color(chartEndpoint, lv_color_hex(statusAccent), 0);
+        setTextColorIfChanged(statusWeight, lv_color_hex(state.weight > 0 ? 0xadadad : 0x292929));
+        setTextColorIfChanged(statusPressure, lv_color_hex(state.pressure > 0 ? statusAccent : 0x292929));
+        if (pressureSeries->color.full != lv_color_hex(statusAccent).full) lv_chart_set_series_color(chart, pressureSeries, lv_color_hex(statusAccent));
+        if (lv_obj_get_style_line_color(chart, LV_PART_MAIN).full != lv_color_hex(statusAccent).full)
+            lv_obj_set_style_line_color(chart, lv_color_hex(statusAccent), LV_PART_MAIN);
+        if (lv_obj_get_style_bg_color(chartEndpoint, LV_PART_MAIN).full != lv_color_hex(statusAccent).full)
+            lv_obj_set_style_bg_color(chartEndpoint, lv_color_hex(statusAccent), 0);
         const float endpointPressure = state.processComplete ? 0.0f : LV_CLAMP(0.0f, state.pressure, 10.0f);
         const int endpointY = 286 + static_cast<int>((10.0f - endpointPressure) * 8.0f);
         lv_obj_set_pos(chartEndpoint, 312, endpointY - 2);
@@ -1284,7 +1495,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         lv_obj_add_flag(targetRow, LV_OBJ_FLAG_HIDDEN);
         setImageSourceIfChanged(contextIcon, &concept_grind);
         if (lv_img_get_zoom(contextIcon) != 112) lv_img_set_zoom(contextIcon, 112);
-        lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(0xc89020), 0);
+        setImageRecolorIfChanged(contextIcon, lv_color_hex(0xc89020));
         setTextFontIfChanged(mainValue, &dm_sans_88_bold);
         const bool grindActive = controller->isGrindActive();
         const int grindTargetSeconds = controller->getTargetGrindDuration() / 1000;
@@ -1294,10 +1505,10 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         mainGeometryChanged |= setLabelTextIfChanged(mainUnit, "s");
         setLabelTextFmtIfChanged(grindTargetValue, "%ds", grindTargetSeconds);
         setLabelTextIfChanged(stateLabel, grindActive ? "GRINDING" : "");
-        lv_obj_set_style_text_color(stateLabel, lv_color_hex(0xc89020), 0);
+        setTextColorIfChanged(stateLabel, lv_color_hex(0xc89020));
         if (grindActive) lv_obj_clear_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_img_recolor(stateSpinner, lv_color_hex(0xc89020), 0);
+        setImageRecolorIfChanged(stateSpinner, lv_color_hex(0xc89020));
     } else {
         if (!editing) {
             lv_obj_clear_flag(mainDecimal, LV_OBJ_FLAG_HIDDEN);
@@ -1309,7 +1520,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         else setImageSourceIfChanged(contextIcon, &concept_water);
         const uint16_t iconZoom = view == View::Brew && state.temperatureStable ? 256 : 112;
         if (lv_img_get_zoom(contextIcon) != iconZoom) lv_img_set_zoom(contextIcon, iconZoom);
-        lv_obj_set_style_img_recolor(contextIcon, lv_color_hex(accent), 0);
+        setImageRecolorIfChanged(contextIcon, lv_color_hex(accent));
         const float shownTemperature = state.temperature > 0.0f ? state.temperature : 22.0f;
         setTextFontIfChanged(mainValue, &dm_sans_88_bold);
         snprintf(main, sizeof(main), "%.0f", std::floor(shownTemperature));
@@ -1319,7 +1530,7 @@ void ConceptUI::update(const ConceptUIState &inputState) {
         mainGeometryChanged |= setLabelTextIfChanged(mainUnit, "°C");
         setTextColorIfChanged(mainValue, WHITE);
         setLabelTextIfChanged(secondaryValue, secondary);
-        lv_obj_set_style_img_recolor(targetIcon, lv_color_hex(accent), 0);
+        setImageRecolorIfChanged(targetIcon, lv_color_hex(accent));
         // The overview is a temperature target screen. Sensor offset/noise can
         // report pressure while idle, but pressure belongs to infusion/brew and
         // must not make an extra icon, separator and bar value appear here.
@@ -1329,13 +1540,13 @@ void ConceptUI::update(const ConceptUIState &inputState) {
             if (showPressure) lv_obj_clear_flag(obj, LV_OBJ_FLAG_HIDDEN);
             else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
         }
-        lv_obj_set_style_img_recolor(targetPressureIcon, lv_color_hex(accent), 0);
+        setImageRecolorIfChanged(targetPressureIcon, lv_color_hex(accent));
         if (view == View::Brew) {
             setLabelTextIfChanged(stateLabel, state.temperatureStable ? "READY" : "HEATING");
-            lv_obj_set_style_text_color(stateLabel, lv_color_hex(state.temperatureStable ? 0x2ab8d8 : 0x4a8cf0), 0);
+            setTextColorIfChanged(stateLabel, lv_color_hex(state.temperatureStable ? 0x2ab8d8 : 0x4a8cf0));
             // Heat is shown in the status cluster, not beside the state text.
             lv_obj_add_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_set_style_img_recolor(stateSpinner, lv_color_hex(0x4a8cf0), 0);
+            setImageRecolorIfChanged(stateSpinner, lv_color_hex(0x4a8cf0));
         } else {
             setLabelTextIfChanged(stateLabel, "");
             lv_obj_add_flag(stateSpinner, LV_OBJ_FLAG_HIDDEN);
@@ -1378,6 +1589,7 @@ void ConceptUI::updateProfileDots() {
 }
 
 void ConceptUI::updateTouchGesture() {
+    if (quickOpen) return;
     lv_indev_t *indev = lv_indev_get_act();
     if (indev == nullptr || view != View::Brew) return;
     lv_point_t point;
@@ -1628,14 +1840,15 @@ void ConceptUI::applyStateGradient(int gradient, float fill) {
 void ConceptUI::updateHeatingGradient() {
     // Keep the native gradient fully opaque. Blending a pre-quantized layer
     // creates a second RGB565 quantisation pass and reintroduces banding.
-    lv_obj_set_style_opa(stateBackground, LV_OPA_COVER, 0);
+    if (lv_obj_get_style_opa(stateBackground, LV_PART_MAIN) != LV_OPA_COVER)
+        lv_obj_set_style_opa(stateBackground, LV_OPA_COVER, 0);
 }
 
 void ConceptUI::updatePrimaryButton() {
     const bool statusRunning = view == View::Status && !lastState.processComplete;
-    bool active = statusRunning || controller->isActive() || controller->isGrindActive();
+    bool active = view == View::Steam || statusRunning || controller->isActive() || controller->isGrindActive();
     const uint8_t visualState = static_cast<uint8_t>((view == View::Status ? 8 : 0) |
-        (lastState.processComplete ? 4 : 0) | (active ? 2 : 0) | (lastState.temperatureStable ? 1 : 0));
+        (view == View::Steam ? 16 : 0) | (lastState.processComplete ? 4 : 0) | (active ? 2 : 0) | (lastState.temperatureStable ? 1 : 0));
     if (visualState == renderedPrimaryState) return;
     renderedPrimaryState = visualState;
     const uint32_t accent = lastState.processComplete ? 0x28c870 :
@@ -1679,6 +1892,8 @@ void ConceptUI::handlePrimary() {
             return;
         }
         controller->activate();
+    } else if (view == View::Steam) {
+        setMode(View::Brew);
     } else if (view == View::Water) {
         controller->isActive() ? controller->deactivate() : controller->activate();
     } else if (view == View::Grind) {
@@ -1687,6 +1902,21 @@ void ConceptUI::handlePrimary() {
 }
 
 void ConceptUI::handleGesture(lv_dir_t direction) {
+    if (quickOpen) {
+        if (direction == LV_DIR_TOP) {
+            const bool flushing = quickFlushRunning;
+            setQuickOpen(false);
+            if (flushing) {
+                show(SCREEN_ID_STATUS_SCREEN);
+                owner->changeScreen(SCREEN_ID_STATUS_SCREEN);
+            }
+        }
+        return;
+    }
+    if (direction == LV_DIR_BOTTOM && touchStart.y <= 112 && view != View::Standby && view != View::Status) {
+        setQuickOpen(true);
+        return;
+    }
     if (direction == LV_DIR_TOP && view != View::Standby && view != View::Status && view != View::Menu) {
         controller->deactivate();
         owner->changeScreen(SCREEN_ID_MENU_SCREEN_NEW);
@@ -1716,11 +1946,31 @@ void ConceptUI::eventCallback(lv_event_t *event) {
     lv_obj_t *target = lv_event_get_current_target(event);
     const lv_event_code_t code = lv_event_get_code(event);
     if (code == LV_EVENT_PRESSED) {
+        self->quickTap = true;
+        self->suppressNextClick = false; // A fresh touch must not inherit the preceding swipe's click suppression.
         lv_indev_t *indev = lv_indev_get_act();
         if (indev != nullptr) {
             lv_indev_get_point(indev, &self->touchStart);
             self->touchTracking = true;
         }
+        return;
+    }
+    if (self->quickOpen && code == LV_EVENT_PRESSING) {
+        lv_point_t point;
+        if (auto *indev = lv_indev_get_act()) {
+            lv_indev_get_point(indev, &point);
+            if (std::abs(point.x - self->touchStart.x) > 12 || std::abs(point.y - self->touchStart.y) > 12) self->quickTap = false;
+        }
+    }
+    if (self->quickOpen && target == self->quickButtons[2] && code == LV_EVENT_LONG_PRESSED && self->quickTap &&
+        self->controller->getSettings().getFlushDuration() == 0 && self->quickEnabled[2] && !self->quickFlushRunning) {
+        self->quickTap = false;
+        self->owner->onTouchFlushStart();
+        self->quickFlushTracking = true;
+        self->quickFlushComplete = false;
+        self->controller->setMode(MODE_BREW);
+        self->controller->onFlush();
+        self->updateQuickSettings();
         return;
     }
     if (code == LV_EVENT_RELEASED && self->touchTracking) {
@@ -1752,6 +2002,31 @@ void ConceptUI::eventCallback(lv_event_t *event) {
         self->suppressNextClick = false;
         return;
     }
+    if (self->quickOpen && code == LV_EVENT_CLICKED) {
+        if (!self->quickTap) return;
+        if (target == self->quickClose) self->handleGesture(LV_DIR_TOP);
+        else if (target == self->quickButtons[0] && self->quickEnabled[0]) self->controller->onTargetToggle();
+        else if (target == self->quickButtons[1] && self->quickEnabled[1]) BLEScales.tare();
+        else if (target == self->quickButtons[2] && self->quickEnabled[2]) {
+            if (self->quickFlushRunning) {
+                self->quickFlushRunning = false;
+                self->quickFlushComplete = false;
+                lv_arc_set_value(self->quickFlushProgress, 0);
+                self->controller->deactivate();
+            } else if (self->controller->getSettings().getFlushDuration() > 0) {
+                self->quickFlushTracking = true;
+                self->quickFlushComplete = false;
+                self->controller->setMode(MODE_BREW);
+                self->controller->onFlush();
+            }
+            self->updateQuickSettings();
+        } else if (target == self->quickButtons[3] && self->quickEnabled[3]) {
+            self->setQuickOpen(false);
+            self->controller->activateStandby();
+            self->owner->changeScreen(SCREEN_ID_STANDBY_SCREEN);
+        }
+        return;
+    }
     if (target == self->brewConfirmCancel) {
         self->owner->setBrewConfirmVisible(false);
         lv_obj_add_flag(self->brewConfirmOverlay, LV_OBJ_FLAG_HIDDEN);
@@ -1768,13 +2043,13 @@ void ConceptUI::eventCallback(lv_event_t *event) {
         self->owner->changeScreen(SCREEN_ID_BREW_SCREEN);
     } else if (target == self->primaryButton) {
         self->handlePrimary();
-    } else if (target == self->secondaryValue && self->view == View::Brew) {
+    } else if (target == self->secondaryValue && (self->view == View::Brew || self->view == View::Steam)) {
         self->setEditing(true);
     } else if (target == self->editButtons[0]) {
-        self->owner->markProfileDirty();
+        if (self->view == View::Brew) self->owner->markProfileDirty();
         self->controller->lowerTemp();
     } else if (target == self->editButtons[1]) {
-        self->owner->markProfileDirty();
+        if (self->view == View::Brew) self->owner->markProfileDirty();
         self->controller->raiseTemp();
     } else if (target == self->editButtons[2]) {
         self->owner->markProfileDirty();
@@ -1783,8 +2058,10 @@ void ConceptUI::eventCallback(lv_event_t *event) {
         self->owner->markProfileDirty();
         self->controller->raiseBrewTarget();
     } else if (target == self->editDoneButton) {
-        self->controller->onProfileSave();
-        self->owner->markProfileClean();
+        if (self->view == View::Brew) {
+            self->controller->onProfileSave();
+            self->owner->markProfileClean();
+        }
         self->setEditing(false);
     } else if (target == self->grindMinus) {
         self->controller->lowerGrindTarget();

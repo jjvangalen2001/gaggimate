@@ -429,15 +429,7 @@ def main():
         "profile_right": profile_arrow(False),
     }.items():
         write_asset(name, image)
-    states = {
-        # These are permanent background layers. UI and charts are composed
-        # above them; heating only breathes via a subtle whole-image opacity.
-        "bg_heating": ((0,17,46),(15,70,215,.52)), "bg_ready": ((0,24,32),(15,155,190,.44)),
-        "bg_preinfuse": ((30,9,0),(175,65,0,.54)), "bg_brewing": ((40,0,0),(188,8,8,.60)),
-        "bg_done": ((0,26,14),(18,175,75,.42)), "bg_steam": ((0,14,34),(15,88,200,.50)),
-        "bg_water": ((0,16,32),(15,100,208,.46)), "bg_grind": ((26,16,0),(160,110,10,.50)),
-    }
-    for name, (ground, glow) in states.items(): write_rgb_asset(name, state_background(ground, glow))
+    # Backgrounds are rendered live by ConceptUI; do not regenerate obsolete bitmaps.
 
 
 if __name__ == "__main__":

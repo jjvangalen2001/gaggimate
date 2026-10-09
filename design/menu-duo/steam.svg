@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="78" height="78" viewBox="0 0 78 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="STEAM" opacity="0.75">
+<path id="track L" d="M18.7169 70.838C13.3636 67.4276 8.9566 62.7223 5.90356 57.1573C2.85053 51.5924 1.25 45.3474 1.25 39C1.25 32.6526 2.85053 26.4076 5.90356 20.8427C8.9566 15.2777 13.3636 10.5724 18.7169 7.16198" stroke-width="2.5" stroke-linecap="round" stroke="#1F1F1F"/>
+<path id="track R" d="M59.2831 7.16197C64.6364 10.5724 69.0434 15.2777 72.0964 20.8427C75.1495 26.4076 76.75 32.6526 76.75 39C76.75 45.3474 75.1495 51.5924 72.0964 57.1573C69.0434 62.7223 64.6364 67.4276 59.2831 70.838" stroke-width="2.5" stroke-linecap="round" stroke="#1F1F1F"/>
+<path id="value L" d="M18.7169 70.838C12.2779 66.7359 7.23404 60.7778 4.25094 53.7501" stroke-width="2.5" stroke-linecap="round" stroke="#D22626"/>
+<g id="glyph" opacity="0.8">
+<path id="Vector" d="M34 49C31.75 45.75 36.25 44.25 34 41C31.75 37.75 36.25 36.25 34 33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="white"/>
+<path id="Vector_2" d="M39 49C36.75 45.75 41.25 44.25 39 41C36.75 37.75 41.25 36.25 39 33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="white"/>
+<path id="Vector_3" d="M44 49C41.75 45.75 46.25 44.25 44 41C41.75 37.75 46.25 36.25 44 33" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="white"/>
+</g>
+</g>
+</svg>
